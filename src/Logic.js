@@ -21,14 +21,14 @@ class Component extends DCLogic {
   theme(dark, accent, status) {
     const A = accent === 'indigo'
       ? (dark ? { a: '#8b93ff', as: '#a5abff', at: '#a5abff', aS: '#24244a' } : { a: '#4f46e5', as: '#4338ca', at: '#4338ca', aS: '#eef0ff' })
-      : (dark ? { a: '#ef8240', as: '#f59d66', at: '#f59d66', aS: '#3a2416' } : { a: '#e8732c', as: '#c95f1f', at: '#b8530f', aS: '#fcebdf' });
+      : (dark ? { a: '#ef8240', as: '#f59d66', at: '#d8d3c9', aS: '#2b2926' } : { a: '#e8732c', as: '#c95f1f', at: '#4a4640', aS: '#f3f1ee' });
     const B = dark
       ? { bg: '#151413', surface: '#151413', surface2: '#1f1e1c', input: '#1f1e1c', border: '#302e2a', borderStrong: '#47433d', text: '#f3f0ea', muted: '#a39e95', ink: '#f3f0ea', inkText: '#1b1a18', neutral: '#2b2926', danger: '#f59d66', shadow: 'none' }
       : { bg: '#ffffff', surface: '#ffffff', surface2: '#f6f5f3', input: '#f6f5f3', border: '#e7e2db', borderStrong: '#d3ccc2', text: '#1d1c1a', muted: '#6b675f', ink: '#2f2e2c', inkText: '#ffffff', neutral: '#ece8e2', danger: '#b8530f', shadow: 'none' };
     const sem = status === 'semantic';
     const S = sem
       ? (dark ? { okBg: '#16301f', okFg: '#5fd39a', warnBg: '#342912', warnFg: '#e8b84a', errBg: '#3a1b1b', errFg: '#f58a8a' } : { okBg: '#e3f2ea', okFg: '#1e7a4f', warnBg: '#fbf0d6', warnFg: '#8a5d04', errBg: '#fbe6e4', errFg: '#b42323' })
-      : { okBg: B.ink, okFg: B.inkText, warnBg: A.aS, warnFg: A.at, errBg: dark ? A.a : A.at, errFg: dark ? '#1b1a18' : '#fff' };
+      : { okBg: B.ink, okFg: B.inkText, warnBg: A.aS, warnFg: A.at, errBg: dark ? '#2b2926' : '#f3f1ee', errFg: dark ? '#f3f0ea' : '#1d1c1a' };
     S.warnBorder = sem ? S.warnFg : A.a;
     S.errDotStrong = sem ? S.errFg : A.a;
     S.errRing = sem ? S.errBg : A.aS;
@@ -93,24 +93,24 @@ class Component extends DCLogic {
     const fmt = (n) => Math.round(n).toLocaleString('id-ID');
     const rp = (n) => 'Rp ' + fmt(n);
     const rpS = (n) => n >= 1e6 ? 'Rp ' + (n / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' jt' : n >= 1e3 ? 'Rp ' + Math.round(n / 1e3) + ' rb' : rp(n);
-    const PL = { ok: ['var(--okBg)', 'var(--okFg)'], err: ['var(--errBg)', 'var(--errFg)'], warn: ['var(--warnBg)', 'var(--warnFg)'], neutral: ['var(--neutral)', 'var(--muted)'], soft: ['var(--accentSoft)', 'var(--accentText)'], accent: ['var(--accent)', '#fff'], plain: ['var(--surface)', 'var(--text)'] };
-    const pill = (k, ex = {}) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', justifySelf: 'start', alignSelf: 'center', background: PL[k][0], color: PL[k][1], ...ex });
-    const chip = (on) => ({ fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: on ? 700 : 600, whiteSpace: 'nowrap', flex: 'none', background: on ? 'var(--text)' : 'var(--surface2)', color: on ? 'var(--surface)' : 'var(--text)' });
+    const PL = { ok: ['var(--okBg)', 'var(--okFg)'], err: ['var(--errBg)', 'var(--errFg)'], warn: ['var(--warnBg)', 'var(--warnFg)'], neutral: ['var(--neutral)', 'var(--muted)'], soft: ['var(--accentSoft)', 'var(--text)'], accent: ['var(--ink)', 'var(--inkText)'], plain: ['var(--surface)', 'var(--text)'] };
+    const pill = (k, ex = {}) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999, fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', justifySelf: 'start', alignSelf: 'center', background: PL[k][0], color: PL[k][1], ...ex });
+    const chip = (on) => ({ fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: on ? 500 : 400, whiteSpace: 'nowrap', flex: 'none', background: on ? 'var(--text)' : 'var(--surface2)', color: on ? 'var(--surface)' : 'var(--text)' });
     const say = (title, sub = '') => { set({ toast: { title, sub } }); clearTimeout(this.tt); this.tt = setTimeout(() => this.setState({ toast: null }), 3200); };
     const copy = (txt, key) => { try { navigator.clipboard.writeText(txt); } catch (e) {} set({ copied: key }); clearTimeout(this.ct); this.ct = setTimeout(() => this.setState({ copied: null }), 1400); };
     const sw = (on, toggle) => ({ toggle, track: { fontFamily: 'inherit', width: 40, height: 24, borderRadius: 999, border: 'none', padding: 2, cursor: 'pointer', background: on ? 'var(--accent)' : 'var(--borderStrong)', display: 'flex', justifyContent: on ? 'flex-end' : 'flex-start', flex: 'none', justifySelf: 'end' }, knob: { width: 20, height: 20, borderRadius: '50%', background: '#fff', display: 'block' } });
     const TT = [['var(--ink)', 'var(--inkText)'], ['var(--accent)', '#fff'], ['var(--accentSoft)', 'var(--accentText)'], ['var(--neutral)', 'var(--text)']];
-    const thumb = (i, z = 36) => ({ width: z, height: z, flex: 'none', borderRadius: z > 40 ? 14 : 8, background: TT[i % 4][0], color: TT[i % 4][1], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: z > 40 ? 20 : z < 32 ? 10 : 12, fontWeight: 800 });
+    const thumb = (i, z = 36) => ({ width: z, height: z, flex: 'none', borderRadius: z > 40 ? 14 : 8, background: TT[i % 4][0], color: TT[i % 4][1], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: z > 40 ? 20 : z < 32 ? 10 : 12, fontWeight: 600 });
     const ini = (t) => t.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w[0] || '')).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-    const BTN = { fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 36, padding: '0 14px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flex: 'none' };
-    const bP = { ...BTN, background: 'var(--accent)', color: '#fff' }, bW = { ...BTN, background: 'var(--surface)', color: 'var(--text)' }, bN = { ...BTN, background: 'var(--neutral)', color: 'var(--muted)' }, bD = { ...BTN, background: 'transparent', color: 'var(--danger)' };
+    const BTN = { fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 36, padding: '0 14px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', flex: 'none' };
+    const bP = { ...BTN, background: 'var(--accent)', color: '#fff' }, bW = { ...BTN, background: 'var(--surface)', color: 'var(--text)' }, bN = { ...BTN, background: 'var(--neutral)', color: 'var(--muted)' }, bS = { ...BTN, background: 'var(--surface2)', color: 'var(--text)' }, bD = { ...BTN, background: 'transparent', color: 'var(--danger)' };
     const goP = (page) => (e) => { if (e && e.preventDefault) e.preventDefault(); set({ page }); };
     const NOW = new Date(2026, 9, 17, 14, 40);
     const tfmt = (d) => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) + ', ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
     const CH = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789', HEX = '0123456789abcdef';
     const clidOf = (i) => 'AR' + Array.from({ length: 22 }, (_, k) => CH[(i * 31 + k * 17 + k * k * 7) % CH.length]).join('');
     const sha = (i) => Array.from({ length: 64 }, (_, k) => HEX[(i * 13 + k * 7 + k * k) % 16]).join('');
-    const SRCB = { display: 'inline-flex', alignItems: 'center', justifySelf: 'start', height: 24, padding: '0 8px', borderRadius: 6, background: 'var(--surface)', color: 'var(--text)', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 };
+    const SRCB = { display: 'inline-flex', alignItems: 'center', justifySelf: 'start', height: 24, padding: '0 8px', borderRadius: 6, background: 'var(--surface)', color: 'var(--text)', fontFamily: "'Poppins',monospace", fontSize: 11, fontWeight: 400 };
     const EVP = { Mengirim: 'warn', Terkirim: 'ok', Gagal: 'err', Duplikat: 'neutral', Retry: 'warn', Kedaluwarsa: 'neutral' };
     const dotC = (k) => k === 'ok' ? (sem ? 'var(--okFg)' : 'var(--text)') : k === 'err' ? 'var(--errDotStrong)' : 'var(--accentText)';
     const disc = s.disc || {}; const metaOn = !disc.meta, waOn = !!s.waOn && !disc.wa, adOn = !disc.ad && s.ws !== 1;
@@ -152,13 +152,11 @@ class Component extends DCLogic {
     const chatLine = path(cs, cMax);
     const xL = Array.from({ length: 6 }, (_, k) => { const i = Math.round(k / 5 * (n - 1)); return new Date(2026, 9, 17 - (n - 1 - i)).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }); });
     const topAds = allAds.slice().sort((x, y) => y.a[4] - x.a[4]).slice(0, 5).map(({ a, camp }) => ({ name: a[0], camp, ini: ini(a[0]), thumb: thumb(adIdx(a[0])), spend: rpS(a[1]), chat: fmt(a[2]), purch: fmt(a[4]), roas: roasT(a[5] / a[1]), rs: roasPill(a[5] / a[1]) }));
-    const insights = [[ic.alert, 'err', 'Iklan “Kopi Gratis Ulang Tahun”: 48 chat, 0 purchase dalam 14 hari', 'Rp 450.000 terpakai tanpa closing. Pertimbangkan jeda atau ganti materi iklan.', 'Lihat iklan →', 'performa'], [ic.trend, 'ok', '“Paket Bundling Hampers” ROAS 18,6× — tertinggi minggu ini', 'Rata-rata order Rp 550.000. Naikkan budget ad set “Pekerja kantor”.', 'Lihat performa →', 'performa'], [ic.clock, 'soft', '23 lead Checkout lewat batas 7 hari dalam 24 jam', 'Tandai Purchase sekarang agar Meta tetap menghitungnya.', 'Buka Leads →', 'leads']]
-      .map(([icon, k, title, body, cta, pg]) => ({ icon, title, body, cta, go: goP(pg), is: { width: 32, height: 32, flex: 'none', borderRadius: 9, background: PL[k][0], color: PL[k][1], display: 'flex', alignItems: 'center', justifyContent: 'center' } }));
     const health = [['Meta Dataset', metaOn ? 'Terhubung' : 'Terputus', metaOn ? 'ok' : 'err'], ['WhatsApp +62 812-•••-7890', waOn ? 'Terhubung' : 'Terputus', waOn ? 'ok' : 'err'], ['Event gagal 24 jam', '3 event', 'warn'], ['Masa berlaku token Meta', tokenDays + ' hari lagi', tokenDays < 14 ? 'warn' : 'ok']]
-      .map(([label, value, k]) => ({ label, value, dot: { width: 8, height: 8, borderRadius: '50%', flex: 'none', background: dotC(k) }, vs: { fontSize: 13, fontWeight: 700, color: k === 'ok' ? 'var(--text)' : 'var(--accentText)' } }));
+      .map(([label, value, k]) => ({ label, value, dot: { width: 8, height: 8, borderRadius: '50%', flex: 'none', background: dotC(k) }, vs: { fontSize: 13, fontWeight: 500, color: k === 'ok' ? 'var(--text)' : 'var(--accentText)' } }));
     const steps = [['Buat workspace', 'Laundry Kilat Bersih · Jasa · Depok', true], ['Hubungkan Meta Dataset', 'Dataset & access token untuk Conversions API', true], ['Hubungkan WhatsApp', 'Agar chat dari iklan tercatat sebagai Lead', false, 'Hubungkan', 'koneksi'], ['Pilih cara kirim konversi', 'API, tandai manual, atau aturan otomatis', false, 'Atur', 'aturan'], ['Kirim event percobaan', 'Pastikan event muncul di Meta Test Events', false, 'Kirim tes', 'developer']]
-      .map(([title, desc, done, cta, pg]) => ({ title, desc, todo: !done, cta, go: goP(pg), mark: done ? ic.check : '', ts: { fontSize: 14, fontWeight: 700, color: done ? 'var(--muted)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none' }, dot: { width: 26, height: 26, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: done ? 'var(--accent)' : 'var(--neutral)', color: '#fff' } }));
-    const ov = { starter: s.ws === 3, full: s.ws !== 3, kpis, funnel, funnelRate: 'Klik → Purchase ' + (purch / klik * 100).toFixed(1).replace('.', ',') + '%', chatLine, chatArea: chatLine + ' L700,219 L0,219 Z', purchLine: path(ps, pMax), xL, yL: [cMax, cMax / 2, 0].map(fmt), yR: [pMax, pMax / 2, 0].map(fmt), topAds, insights, health, steps, goPerf: goP('performa'), goKoneksi: goP('koneksi') };
+      .map(([title, desc, done, cta, pg]) => ({ title, desc, todo: !done, cta, go: goP(pg), mark: done ? ic.check : '', ts: { fontSize: 14, fontWeight: 500, color: done ? 'var(--muted)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none' }, dot: { width: 26, height: 26, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: done ? 'var(--accent)' : 'var(--neutral)', color: '#fff' } }));
+    const ov = { starter: s.ws === 3, full: s.ws !== 3, kpis, funnel, funnelRate: 'Klik → Purchase ' + (purch / klik * 100).toFixed(1).replace('.', ',') + '%', chatLine, chatArea: chatLine + ' L700,219 L0,219 Z', purchLine: path(ps, pMax), xL, yL: [cMax, cMax / 2, 0].map(fmt), yR: [pMax, pMax / 2, 0].map(fmt), topAds, health, steps, goPerf: goP('performa'), goKoneksi: goP('koneksi') };
 
     // ---------- leads ----------
     const LB = [[1, 'Andi Pratama', '628•••7890', 0, 'Kak, promo kopi susu 2.0 masih ada?', 6, 'Baru', 0], [2, 'Siti Rahmawati', '628•••4412', 1, 'Mau pesan hampers 10 box buat kantor, bisa invoice PT?', 20, 'Checkout', 3500000], [3, 'Budi Santoso', '628•••0921', 2, 'Menu baru ada yang non-kopi?', 30, 'Lead', 0], [4, 'Dewi Lestari', '628•••3378', 0, 'Bisa kirim ke Tebet hari ini?', 52, 'Purchase', 89000], [5, 'Rizky Hidayat', '628•••6650', 3, 'Kode diskonnya apa kak?', 75, 'Lead', 0], [6, 'Nur Aini', '628•••1209', 1, 'Hampers yang 350rb isinya apa aja?', 151, 'Checkout', 350000], [7, 'Fajar Nugroho', '628•••8834', 4, 'Halo, buka jam berapa ya?', 160, 'Baru', 0], [8, 'Putri Ayu', '628•••5521', 2, 'Saya mau 2 Aren Latte ya', 98, 'Purchase', 64000], [9, 'Hendra Wijaya', '628•••7716', 0, 'Kak jadi pesan 1 liter ya', 190, 'Checkout', 120000], [10, 'Maya Sari', '628•••2290', 5, 'Ultah saya besok, dapat kopi gratis?', 40, 'Hilang', 0], [11, 'Agus Salim', '628•••4057', 3, 'Sudah transfer ya kak, 215rb', 12, 'Checkout', 215000], [12, 'Lina Marlina', '628•••9183', -1, 'Halo kak, mau tanya', 3, 'Baru', 0]];
@@ -172,12 +170,12 @@ class Component extends DCLogic {
     const box = (on) => ({ fontFamily: 'inherit', width: 20, height: 20, borderRadius: 6, border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: on ? 'var(--accent)' : 'var(--surface)', color: '#fff', boxShadow: on ? 'none' : 'inset 0 0 0 1.5px var(--borderStrong)' });
     const cdOf = (l) => l.organic ? ['Organik', pill('neutral')] : l.hl <= 0 ? ['Kedaluwarsa', pill('neutral', { textDecoration: 'line-through' })] : l.hl < 24 ? [l.hl + ' jam lagi', pill('err')] : [Math.floor(l.hl / 24) + ' hari lagi', pill('plain')];
     const openMk = (l) => set({ mk: { id: l.id, ev: s.defEv || 'Purchase', amount: l.value ? String(l.value) : '', note: '' }, ldOpen: null });
-    const actOf = (l) => l.status === 'Purchase' ? ['Terkirim ✓', bN, () => set({ ldOpen: l.id })] : l.organic ? ['Tanpa ctwa_clid', bN, () => set({ ldOpen: l.id })] : l.hl <= 0 ? ['Lewat 7 hari', bN, () => openMk(l)] : ['Tandai Purchase', bP, () => openMk(l)];
+    const actOf = (l) => l.status === 'Purchase' ? ['Terkirim ✓', bN, () => set({ ldOpen: l.id })] : l.organic ? ['Tanpa ctwa_clid', bN, () => set({ ldOpen: l.id })] : l.hl <= 0 ? ['Lewat 7 hari', bN, () => openMk(l)] : ['Tandai Purchase', bS, () => openMk(l)];
     const LG = '36px minmax(180px,1.1fr) minmax(230px,1.4fr) minmax(200px,1.3fr) 110px 130px 110px 150px';
     const csv = (name, head, rows) => downloadCsv(name, head, rows);
     const ld = {
       q: s.ldQ || '', setQ: (e) => set({ ldQ: e.target.value }), camp: lcamp, setCamp: (e) => set({ ldCamp: e.target.value }),
-      chips: ['Semua', 'Baru', 'Lead', 'Checkout', 'Purchase', 'Hilang'].map((x) => ({ label: x, count: x === 'Semua' ? lbase.length : lbase.filter((l) => l.status === x).length, pick: () => set({ ldStatus: x }), style: chip(lst === x), cs: { fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: lst === x ? 'rgba(127,127,127,0.25)' : 'var(--surface)' } })),
+      chips: ['Semua', 'Baru', 'Lead', 'Checkout', 'Purchase', 'Hilang'].map((x) => ({ label: x, count: x === 'Semua' ? lbase.length : lbase.filter((l) => l.status === x).length, pick: () => set({ ldStatus: x }), style: chip(lst === x), cs: { fontSize: 11, fontWeight: 500, padding: '1px 7px', borderRadius: 999, background: lst === x ? 'rgba(127,127,127,0.25)' : 'var(--surface)' } })),
       exportCsv: () => csv('convera-leads.csv', ['nama', 'nomor', 'iklan', 'kampanye', 'status', 'nilai'], lrows.map((l) => [l.name, l.phone, l.A ? l.A.name : 'Organik', l.A ? l.A.camp : '-', l.status, l.value])),
       bulk: nSel > 0, selLabel: nSel + ' lead dipilih', clearSel: () => set({ ldSel: {} }),
       bulkLost: () => { const o = { ...lov }; lrows.filter((l) => sel[l.id]).forEach((l) => (o[l.id] = { ...(o[l.id] || {}), status: 'Hilang' })); set({ leadOv: o, ldSel: {} }); say(nSel + ' lead ditandai Hilang'); },
@@ -195,7 +193,7 @@ class Component extends DCLogic {
       const dis = !!warn || (needsValue && !amt);
       const upd = (o) => set({ mk: { ...s.mk, ...o } });
       mk = { open: true, who: ml.name + ' · ' + ml.phone + (ml.A ? ' · ' + ml.A.name : ''), close: () => set({ mk: null }), warn,
-        events: ['Purchase', 'InitiateCheckout', 'AddToCart', 'LeadSubmitted', 'ViewContent'].map((e) => ({ label: e, pick: () => upd({ ev: e }), style: { ...chip(e === ev), height: 32, fontSize: 12, fontFamily: "'JetBrains Mono',monospace" } })),
+        events: ['Purchase', 'InitiateCheckout', 'AddToCart', 'LeadSubmitted', 'ViewContent'].map((e) => ({ label: e, pick: () => upd({ ev: e }), style: { ...chip(e === ev), height: 32, fontSize: 12, fontFamily: "'Poppins',monospace" } })),
         needsValue, amount: amt ? amt.toLocaleString('id-ID') : '', setAmount: (e) => upd({ amount: e.target.value }), quick: [100000, 250000, 500000, 1000000].map((v) => ({ label: rpS(v).replace('Rp ', ''), pick: () => upd({ amount: String(v) }) })),
         note: s.mk.note, setNote: (e) => upd({ note: e.target.value }),
         preview: [['event_name', ev], ['value', needsValue ? (amt ? amt + ' IDR' : '—') : 'tidak dikirim'], ['ctwa_clid', ml.clid ? ml.clid.slice(0, 16) + '…' : '—'], ['action_source', 'business_messaging'], ['user_data.ph', 'sha256(…' + ml.phone.slice(-4) + ')']].map(([k, v]) => ({ k, v })),
@@ -218,7 +216,7 @@ class Component extends DCLogic {
       dl.events.forEach((e) => TL.push([e.ev + ' terkirim manual' + (e.amt ? ' · ' + rp(e.amt) : ''), 'Baru saja']));
       if (dl.organic) TL.push(['Tidak dikirim ke Meta — chat organik tanpa ctwa_clid', '']);
       const [cd] = cdOf(dl);
-      const fs = (mono) => ({ fontSize: 13, fontWeight: 600, color: 'var(--text)', fontFamily: mono ? "'JetBrains Mono',monospace" : 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' });
+      const fs = (mono) => ({ fontSize: 13, fontWeight: 400, color: 'var(--text)', fontFamily: mono ? "'Poppins',monospace" : 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' });
       ldr = { open: true, close: () => set({ ldOpen: null }), name: dl.name, phone: dl.phone, status: dl.status, pill: pill(LSP[dl.status]), thumb: thumb(dl.ad < 0 ? 3 : dl.ad, 64), adIni: dl.A ? ini(dl.A.name) : '—', head: dl.A ? dl.A.head : 'Chat organik', body: dl.A ? dl.A.body : 'Pelanggan menghubungi langsung, bukan dari iklan.', path: dl.A ? dl.A.camp + ' › ' + dl.A.set + ' › ' + dl.A.name : 'Tanpa sumber iklan',
         facts: [['CTWA_CLID', dl.clid ? dl.clid.slice(0, 18) + '…' : '—', 1], ['SISA ATRIBUSI', cd], ['CHAT PERTAMA', add(1)], ['NILAI', dl.value ? rp(dl.value) : '—']].map(([k, v, m]) => ({ k, v, style: fs(m) })),
         timeline: TL.map(([label, time], i) => ({ label, time, line: i < TL.length - 1, dot: { width: 12, height: 12, borderRadius: '50%', flex: 'none', marginTop: 3, background: i === TL.length - 1 ? 'var(--accent)' : 'var(--text)', opacity: i === TL.length - 1 ? 1 : 0.7 } })),
@@ -243,11 +241,11 @@ class Component extends DCLogic {
     const mv = (m) => ({ spend: m[0], purch: m[3], roas: m[0] ? m[4] / m[0] : 0, chat: m[1], val: m[4] }[pfSort] ?? m[0]);
     const PG = 'minmax(280px,2fr) repeat(9,minmax(84px,1fr))';
     const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text)', fontSize: 13 };
-    const cellsOf = (m) => { const [sp, ch, le, pu, va] = m; const r = sp ? va / sp : 0; return [{ t: rpS(sp), s: num }, { t: fmt(ch), s: num }, { t: fmt(le), s: num }, { t: fmt(pu), s: { ...num, fontWeight: 700 } }, { t: rpS(va), s: num }, { t: le ? rpS(sp / le) : '—', s: num }, { t: pu ? rpS(sp / pu) : '—', s: num }, { t: roasT(r), s: roasPill(r) }, { t: ch ? (pu / ch * 100).toFixed(1).replace('.', ',') + '%' : '—', s: num }]; };
+    const cellsOf = (m) => { const [sp, ch, le, pu, va] = m; const r = sp ? va / sp : 0; return [{ t: rpS(sp), s: num }, { t: fmt(ch), s: num }, { t: fmt(le), s: num }, { t: fmt(pu), s: { ...num, fontWeight: 500 } }, { t: rpS(va), s: num }, { t: le ? rpS(sp / le) : '—', s: num }, { t: pu ? rpS(sp / pu) : '—', s: num }, { t: roasT(r), s: roasPill(r) }, { t: ch ? (pu / ch * 100).toFixed(1).replace('.', ',') + '%' : '—', s: num }]; };
     const pfRows = [];
     const prow = (lvl, key, name, sub, m, open) => pfRows.push({ name, sub, cells: cellsOf(m), canToggle: lvl < 2, isAd: lvl === 2, ini: ini(name), thumb: thumb(adIdx(name), 28), toggle: () => set({ pfOpen: { ...pfOpen, [key]: !open } }),
       chev: { fontFamily: 'inherit', width: 24, height: 24, flex: 'none', borderRadius: 6, border: 'none', padding: 0, background: 'transparent', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s' },
-      ns: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, paddingLeft: lvl * 24 }, ts: { fontSize: 13, fontWeight: lvl === 0 ? 800 : lvl === 1 ? 700 : 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+      ns: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, paddingLeft: lvl * 24 }, ts: { fontSize: 13, fontWeight: lvl === 0 ? 600 : lvl === 1 ? 500 : 400, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
       rowStyle: { display: 'grid', gridTemplateColumns: PG, gap: 10, padding: '10px 18px', alignItems: 'center', borderTop: lvl === 0 ? '2px solid var(--bg)' : '1px solid var(--bg)', background: lvl === 2 ? 'rgba(127,127,127,0.05)' : 'transparent' } });
     const srt = (arr) => arr.sort((x, y) => mv(y.m) - mv(x.m));
     srt(PF.map((c, ci) => ({ c, ci, m: sumOf(c[1].flatMap((x) => x[1])) }))).forEach(({ c, ci, m }) => {
@@ -262,61 +260,65 @@ class Component extends DCLogic {
     const allOpen = PF.every((c, ci) => pfOpen['c' + ci]);
     const pf = { none: !adOn, has: adOn, connect: () => { set({ disc: { ...disc, ad: false }, ws: s.ws === 1 ? 0 : s.ws }); say('Ad Account terhubung', 'act_2049381726 · Kopi Senja Ads'); }, rows: pfRows,
       expandLabel: allOpen ? 'Ciutkan semua' : 'Buka semua', expandAll: () => { const o = {}; if (!allOpen) PF.forEach((c, ci) => { o['c' + ci] = true; c[1].forEach((_, si) => (o['c' + ci + 's' + si] = true)); }); set({ pfOpen: o }); },
-      cols: [['Spend', 'spend'], ['Chat', 'chat'], ['Lead'], ['Purchase', 'purch'], ['Nilai', 'val'], ['CPL'], ['CPP'], ['ROAS', 'roas'], ['Conv.']].map(([label, key]) => ({ label: label + (key && pfSort === key ? ' ↓' : ''), sort: () => key && set({ pfSort: key }), style: { fontFamily: 'inherit', border: 'none', background: 'transparent', padding: 0, textAlign: 'right', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', cursor: key ? 'pointer' : 'default', color: key && pfSort === key ? 'var(--text)' : 'var(--muted)' } })),
+      cols: [['Spend', 'spend'], ['Chat', 'chat'], ['Lead'], ['Purchase', 'purch'], ['Nilai', 'val'], ['CPL'], ['CPP'], ['ROAS', 'roas'], ['Conv.']].map(([label, key]) => ({ label: label + (key && pfSort === key ? ' ↓' : ''), sort: () => key && set({ pfSort: key }), style: { fontFamily: 'inherit', border: 'none', background: 'transparent', padding: 0, textAlign: 'right', fontSize: 11, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', cursor: key ? 'pointer' : 'default', color: key && pfSort === key ? 'var(--text)' : 'var(--muted)' } })),
       lg1: pill('ok'), lg2: pill('soft'), lg3: pill('err') };
 
     // ---------- aturan ----------
-    const EVL = { Purchase: ['Pembelian selesai', 'Pelanggan sudah bayar / transfer.'], InitiateCheckout: ['Mulai checkout', 'Invoice atau total tagihan sudah dikirim.'], AddToCart: ['Siap order', 'Pelanggan memilih produk / minta alamat kirim.'], LeadSubmitted: ['Tertarik (lead)', 'Pelanggan bertanya harga atau detail produk.'], ViewContent: ['Lihat katalog', 'Pelanggan meminta katalog atau menu.'] };
+    const EVL = { Contact: 1, Lead: 1, 'Hot Lead': 1, Purchase: 1, Complaint: 1, Report: 1 };
+    const EVMAP = { InitiateCheckout: 'Hot Lead', AddToCart: 'Hot Lead', LeadSubmitted: 'Lead', ViewContent: 'Contact', Custom: 'Contact' };
+    const fixEv = (r) => ({ ...r, ev: EVL[r.ev] ? r.ev : (EVMAP[r.ev] || 'Purchase'), val: r.val === 'tetap' ? 'tetap' : 'angka' });
     const WHO = { pelanggan: ['Pelanggan mengirim pesan', 'Cek pesan masuk dari pembeli.', 'pelanggan bilang'], admin: ['Admin / CS membalas', 'Cek pesan yang dikirim tim kamu.', 'admin membalas'], template: ['Template terkirim', 'Saat template pesan tertentu dikirim.', 'template terkirim berisi'] };
-    const VALM = { angka: ['Ambil dari pesan', 'Otomatis baca nominal, mis. “Rp 450.000” atau “215rb”.', 'nilai dari pesan'], tetap: ['Nilai tetap', 'Selalu kirim angka yang sama, cocok untuk jasa.', 'nilai tetap'], manual: ['Diisi CS nanti', 'Lead masuk antrean “Tandai Purchase” untuk diisi nominalnya.', 'nilai diisi CS'] };
-    const RB0 = [{ name: 'Bukti transfer diterima', who: 'pelanggan', op: 'mengandung', kw: 'sudah transfer, udah tf', ev: 'Purchase', val: 'angka', count: 38, last: '2 jam lalu' }, { name: 'Invoice terkirim', who: 'template', op: 'mengandung', kw: 'invoice_pesanan', ev: 'InitiateCheckout', val: 'angka', count: 61, last: '35 menit lalu' }, { name: 'Tanya harga', who: 'pelanggan', op: 'mengandung', kw: 'harga, pricelist', ev: 'LeadSubmitted', val: 'manual', count: 142, last: '5 menit lalu' }, { name: 'Total ongkir', who: 'admin', op: 'mengandung', kw: 'total ongkir', ev: 'AddToCart', val: 'angka', count: 0, last: '—' }];
-    const rulesAll = s.rulesList || RB0;
+    const VALM = { angka: ['Ambil dari pesan', 'Otomatis baca nominal, mis. “Rp 450.000” atau “215rb”.', 'nilai dari pesan'], tetap: ['Nilai tetap', 'Selalu kirim angka yang sama, cocok untuk jasa.', 'nilai tetap'] };
+    const RB0 = [{ name: 'Bukti transfer diterima', who: 'pelanggan', op: 'mengandung', kw: 'sudah transfer, udah tf', ev: 'Purchase', val: 'angka', count: 38, last: '2 jam lalu' }, { name: 'Invoice terkirim', who: 'template', op: 'mengandung', kw: 'invoice_pesanan', ev: 'Hot Lead', val: 'angka', count: 61, last: '35 menit lalu' }, { name: 'Tanya harga', who: 'pelanggan', op: 'mengandung', kw: 'harga, pricelist', ev: 'Lead', val: 'manual', count: 142, last: '5 menit lalu' }, { name: 'Total ongkir', who: 'admin', op: 'mengandung', kw: 'total ongkir', ev: 'Hot Lead', val: 'angka', count: 0, last: '—' }];
+    const rulesAll = (s.rulesList || RB0).map(fixEv);
     const ron = s.rulesOn || { 3: false };
     const atTab = s.atTab || 'list';
     const blank = { name: '', who: 'pelanggan', op: 'mengandung', kw: 'sudah transfer, udah tf', ev: 'Purchase', val: 'angka', fixed: '' };
-    const rb = s.rb || blank;
+    const rb = fixEv(s.rb || blank);
     const uR = (k, v) => set({ rb: { ...rb, [k]: v } });
     const fixedN = Number(String(rb.fixed || '').replace(/\D/g, '') || 0);
     const kws = (rb.kw || '').split(',').map((x) => x.trim()).filter(Boolean);
-    const needV = ['Purchase', 'InitiateCheckout', 'AddToCart'].includes(rb.ev);
-    const valTxt = (r) => !['Purchase', 'InitiateCheckout', 'AddToCart'].includes(r.ev) ? 'tanpa nilai' : r.val === 'tetap' ? rp(Number(String(r.fixed || '').replace(/\D/g, '') || 0)) : VALM[r.val][2];
+    const needV = rb.ev === 'Purchase';
+    const valTxt = (r) => r.ev !== 'Purchase' ? 'tanpa nilai' : r.val === 'tetap' ? rp(Number(String(r.fixed || '').replace(/\D/g, '') || 0)) : VALM[r.val][2];
     const whenTxt = (r) => WHO[r.who][2] + ' ' + (r.op === 'sama dengan' ? 'persis ' : '') + r.kw.split(',').map((x) => '“' + x.trim() + '”').join(' / ');
-    const msg = s.rtMsg ?? 'Sudah transfer ya kak, total Rp 450.000. Mohon dicek';
+    const draft = s.rtMsg ?? '';
     const from = s.rtFrom || 'pelanggan';
-    const m = msg.toLowerCase();
-    const whoOk = rb.who === 'template' ? from === 'admin' : from === rb.who;
-    const hit = kws.find((k) => rb.op === 'mengandung' ? m.includes(k.toLowerCase()) : m.trim() === k.toLowerCase());
-    const matched = whoOk && !!hit;
-    let found = 0; const ma = msg.match(/rp\.?\s?([\d.,]+)/i); if (ma) found = Number(ma[1].replace(/[.,]/g, '')); else { const mb = msg.match(/(\d+(?:[.,]\d+)?)\s?(rb|ribu|k)\b/i); if (mb) found = Math.round(parseFloat(mb[1].replace(',', '.')) * 1000); else { const mc = msg.match(/\b(\d{4,})\b/); if (mc) found = Number(mc[1]); } }
+    const simLog = s.rtLog || [{ from: 'pelanggan', text: 'Sudah transfer ya kak, total Rp 450.000. Mohon dicek' }];
+    const readVal = (msg) => { let found = 0; const ma = msg.match(/rp\.?\s?([\d.,]+)/i); if (ma) found = Number(ma[1].replace(/[.,]/g, '')); else { const mb = msg.match(/(\d+(?:[.,]\d+)?)\s?(rb|ribu|k)\b/i); if (mb) found = Math.round(parseFloat(mb[1].replace(',', '.')) * 1000); else { const mc = msg.match(/\b(\d{4,})\b/); if (mc) found = Number(mc[1]); } } return found; };
+    const evalMsg = (f, text) => { const m = text.toLowerCase(); const whoOk = rb.who === 'template' ? f === 'admin' : f === rb.who; const hit = kws.find((k) => rb.op === 'mengandung' ? m.includes(k.toLowerCase()) : m.trim() === k.toLowerCase()); return { matched: whoOk && !!hit, found: readVal(text) }; };
+    const simSend = () => { const text = draft.trim(); if (!text) return; set({ rtLog: [...simLog, { from, text }].slice(-20), rtMsg: '' }); };
     const radio = (on) => ({ width: 18, height: 18, flex: 'none', borderRadius: '50%', background: on ? 'var(--accent)' : 'var(--surface2)', boxShadow: on ? 'inset 0 0 0 4px var(--surface)' : 'inset 0 0 0 1.5px var(--borderStrong)' });
     const oc = (on) => ({ fontFamily: 'inherit', textAlign: 'left', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: 14, borderRadius: 12, border: 'none', cursor: 'pointer', background: 'var(--surface)', boxShadow: on ? 'inset 0 0 0 2px var(--accent)' : 'none' });
     const canSave = kws.length > 0 && (rb.val !== 'tetap' || !needV || fixedN > 0);
-    const nameAuto = rb.name || (EVL[rb.ev][0] + ' · ' + (kws[0] || 'kata kunci'));
+    const nameAuto = rb.name || (rb.ev + ' · ' + (kws[0] || 'kata kunci'));
     const at = {
-      tabs: [['list', 'Aturan saya', rulesAll.length], ['new', s.rbEdit != null ? 'Ubah aturan' : 'Buat aturan baru', '']].map(([k, label, count]) => ({ label, count, pick: () => k === 'new' ? set({ atTab: 'new', rb: s.rb || blank }) : set({ atTab: 'list', rbEdit: null }), style: { fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', background: atTab === k ? 'var(--surface)' : 'transparent', color: atTab === k ? 'var(--text)' : 'var(--muted)' }, cs: { display: count === '' ? 'none' : 'inline-flex', fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: 'var(--neutral)', color: 'var(--muted)' } })),
+      tabs: [['list', 'Aturan saya', rulesAll.length], ['new', s.rbEdit != null ? 'Ubah aturan' : 'Buat aturan baru', '']].map(([k, label, count]) => ({ label, count, pick: () => k === 'new' ? set({ atTab: 'new', rb: s.rb || blank }) : set({ atTab: 'list', rbEdit: null }), style: { fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', background: atTab === k ? 'var(--surface)' : 'transparent', color: atTab === k ? 'var(--text)' : 'var(--muted)' }, cs: { display: count === '' ? 'none' : 'inline-flex', fontSize: 11, fontWeight: 500, padding: '1px 7px', borderRadius: 999, background: 'var(--neutral)', color: 'var(--muted)' } })),
       isList: atTab === 'list', isNew: atTab === 'new', startNew: () => set({ atTab: 'new', rb: blank, rbEdit: null }),
-      how: [[ic.chat, '1. Pesan masuk', 'Convera membaca chat WhatsApp dari lead iklan.'], [ic.search, '2. Cocokkan kata kunci', 'Misalnya pelanggan menulis “sudah transfer”.'], [ic.send, '3. Kirim ke Meta', 'Event & nilainya otomatis terkirim — CS tak perlu klik.']].map(([icon, title, body]) => ({ icon, title, body })),
-      activeLabel: rulesAll.filter((_, i) => ron[i] ?? true).length + ' aktif · ' + fmt(rulesAll.reduce((a, r, i) => a + ((ron[i] ?? true) ? r.count : 0), 0)) + ' event terkirim 7 hari terakhir',
+      how: [],
+      activeLabel: '',
       hasRules: rulesAll.length > 0, noRules: rulesAll.length === 0,
       rules: rulesAll.map((r, i) => { const on = ron[i] ?? true; return { name: r.name, when: whenTxt(r), then: r.ev + ' · ' + valTxt(r), stLabel: on ? 'Aktif' : 'Nonaktif', stPill: pill(on ? 'ok' : 'neutral', { height: 22, fontSize: 11 }), stats: on ? (r.count ? r.count + '× terpicu 7 hari · terakhir ' + r.last : 'Belum pernah terpicu') : 'Tidak memantau pesan',
         card: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '16px 18px', borderRadius: 14, background: 'var(--surface2)', opacity: on ? 1 : 0.6 },
         edit: () => set({ atTab: 'new', rb: { fixed: '', ...r }, rbEdit: i }), del: () => { set({ rulesList: rulesAll.filter((_, j) => j !== i), rulesOn: {} }); say('Aturan dihapus', r.name); }, ...sw(on, () => set({ rulesOn: { ...ron, [i]: !on } })) }; }),
-      templates: [['Bukti transfer diterima', { who: 'pelanggan', op: 'mengandung', kw: 'sudah transfer, udah tf, sdh transfer', ev: 'Purchase', val: 'angka' }], ['Invoice terkirim', { who: 'template', op: 'mengandung', kw: 'invoice', ev: 'InitiateCheckout', val: 'angka' }], ['Tanya harga', { who: 'pelanggan', op: 'mengandung', kw: 'harga, pricelist, berapa', ev: 'LeadSubmitted', val: 'manual' }], ['Booking jadwal (jasa)', { who: 'admin', op: 'mengandung', kw: 'jadwal terkonfirmasi', ev: 'Purchase', val: 'tetap', fixed: '150000' }], ['Minta alamat kirim', { who: 'admin', op: 'mengandung', kw: 'alamat lengkap', ev: 'AddToCart', val: 'manual' }], ['Minta katalog', { who: 'pelanggan', op: 'mengandung', kw: 'katalog, menu', ev: 'ViewContent', val: 'manual' }]]
-        .map(([name, cfg]) => { const on = rb.kw === cfg.kw && rb.ev === cfg.ev; return { name, evLabel: EVL[cfg.ev][0], use: () => set({ rb: { name, fixed: '', ...cfg } }), style: { fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '10px 14px', borderRadius: 12, border: 'none', cursor: 'pointer', flex: 'none', textAlign: 'left', background: on ? 'var(--ink)' : 'var(--surface2)', color: on ? 'var(--inkText)' : 'var(--text)' } }; }),
       rb, whoOpts: Object.keys(WHO).map((k) => ({ label: WHO[k][0], desc: WHO[k][1], tech: '', pick: () => uR('who', k), style: oc(rb.who === k), radio: radio(rb.who === k) })),
       setKw: (e) => uR('kw', e.target.value), kwChips: kws, kwHint: kws.length > 1 ? 'cukup salah satu muncul' : kws.length ? '' : 'Tulis minimal satu kata kunci',
       opOpts: [['mengandung', 'Pesan mengandung kata ini'], ['sama dengan', 'Pesan persis sama']].map(([k, label]) => ({ label, pick: () => uR('op', k), style: { ...chip(rb.op === k), height: 30, fontSize: 12 } })),
-      evOpts: Object.keys(EVL).map((k) => ({ label: EVL[k][0], desc: EVL[k][1], tech: k, pick: () => uR('ev', k), style: oc(rb.ev === k), radio: radio(rb.ev === k) })),
-      needV, valOpts: Object.keys(VALM).map((k) => ({ label: VALM[k][0], desc: VALM[k][1], tech: '', pick: () => uR('val', k), style: oc(rb.val === k), radio: radio(rb.val === k) })),
+      evList: Object.keys(EVL), setEv: (e) => uR('ev', e.target.value),
+      needV,
+      valOpts: Object.keys(VALM).map((k) => ({ label: VALM[k][0], desc: VALM[k][1], tech: '', pick: () => uR('val', k), style: oc(rb.val === k), radio: radio(rb.val === k) })),
       isFixed: rb.val === 'tetap', fixedVal: fixedN ? fixedN.toLocaleString('id-ID') : '', setFixed: (e) => uR('fixed', e.target.value),
       nameStep: needV ? '5' : '4', nameVal: rb.name || '', namePh: nameAuto, setName: (e) => uR('name', e.target.value),
-      summary: 'Jika ' + WHO[rb.who][2] + ' ' + (kws.length ? kws.map((x) => '“' + x + '”').join(' atau ') : '…') + ', kirim ' + EVL[rb.ev][0].toLowerCase() + ' (' + rb.ev + ')' + (needV ? ' dengan ' + (rb.val === 'tetap' ? 'nilai ' + rp(fixedN) : VALM[rb.val][2]) : '') + '.',
       fromChips: [['pelanggan', 'Dari pelanggan'], ['admin', 'Dari admin']].map(([k, label]) => ({ label, pick: () => set({ rtFrom: k }), style: { ...chip(from === k), height: 30, fontSize: 12 } })),
-      msg, setMsg: (e) => set({ rtMsg: e.target.value }),
-      resTitle: matched ? 'Cocok — ' + rb.ev + ' akan dikirim' : 'Tidak cocok',
-      resBody: matched ? ('Kata kunci “' + hit + '” ditemukan. ' + (!needV ? 'Dikirim tanpa nilai.' : rb.val === 'angka' ? (found ? 'Nilai terbaca ' + rp(found) + '.' : 'Tidak ada nominal di pesan — dikirim tanpa nilai.') : rb.val === 'tetap' ? 'Nilai ' + rp(fixedN) + '.' : 'Nilai akan diisi CS.')) : !whoOk ? 'Aturan ini mengecek pesan dari ' + (rb.who === 'pelanggan' ? 'pelanggan' : 'admin') + ' — ganti pengirim contoh.' : 'Tidak ada kata kunci yang muncul di pesan ini.',
-      resStyle: { display: 'flex', gap: 12, padding: 14, borderRadius: 12, background: matched ? 'var(--accent)' : 'var(--surface)', color: matched ? '#fff' : 'var(--text)' },
-      resIcon: { width: 26, height: 26, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, background: matched ? 'rgba(255,255,255,0.25)' : 'var(--neutral)' }, resMark: matched ? '✓' : '×',
+      sim: {
+        items: simLog.map(({ from: f, text }) => { const r = evalMsg(f, text); const mine = f === 'admin'; const value = !needV ? '' : rb.val === 'angka' ? (r.found ? ' · ' + rp(r.found) : '') : ' · ' + rp(fixedN);
+          return { text, reply: r.matched ? '✓ ' + rb.ev + value : '✕ Tidak ada event',
+            rowStyle: { display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' },
+            bubble: { maxWidth: '80%', padding: '8px 12px', borderRadius: mine ? '14px 14px 2px 14px' : '14px 14px 14px 2px', background: mine ? 'var(--neutral)' : 'var(--surface2)', color: 'var(--text)', fontSize: 13, lineHeight: 1.5, wordBreak: 'break-word' },
+            replyRowStyle: { display: 'flex', justifyContent: 'center' },
+            replyBubble: { padding: '4px 12px', borderRadius: 999, fontSize: 12, background: r.matched ? 'var(--ink)' : 'transparent', color: r.matched ? 'var(--inkText)' : 'var(--muted)' } }; }),
+        draft, setDraft: (e) => set({ rtMsg: e.target.value }), send: simSend,
+        key: (e) => { if (e.key === 'Enter') { e.preventDefault(); simSend(); } }, clear: () => set({ rtLog: [] }),
+      },
       cancel: () => set({ atTab: 'list', rbEdit: null }),
       saveLabel: s.rbEdit != null ? 'Simpan perubahan' : 'Simpan & aktifkan', saveStyle: { ...bP, height: 46, flex: 2, opacity: canSave ? 1 : 0.4, cursor: canSave ? 'pointer' : 'not-allowed' },
       save: () => { if (!canSave) return; const r = { ...rb, name: nameAuto, count: 0, last: '—' }; if (s.rbEdit != null) { const list = rulesAll.slice(); list[s.rbEdit] = { ...rulesAll[s.rbEdit], ...rb, name: nameAuto }; set({ rulesList: list, atTab: 'list', rbEdit: null }); say('Aturan diperbarui', nameAuto); } else { set({ rulesList: [...rulesAll, r], atTab: 'list' }); say('Aturan aktif', nameAuto); } },
@@ -343,12 +345,12 @@ class Component extends DCLogic {
       const ts = Math.floor(+le.d / 1000);
       const payload = { data: [{ event_name: le.ev, event_time: ts, event_id: le.order, action_source: 'business_messaging', messaging_channel: 'whatsapp', user_data: { ph: [sha(le.i)], ctwa_clid: le.clid, page_id: '104857392018273' }, ...(le.value ? { custom_data: { currency: 'IDR', value: le.value } } : {}) }] };
       const RESP = { Terkirim: { events_received: 1, messages: [], fbtrace_id: 'A7xQ2mLp9Zt' }, Gagal: { error: { message: 'Invalid parameter', type: 'OAuthException', code: 100, error_subcode: 2804050, error_user_msg: 'user_data.ph tidak valid' } }, Retry: { error: { message: 'Application request limit reached', code: 4 } }, Kedaluwarsa: { error: { message: 'event_time is too far in the past', code: 100, error_subcode: 2804003 } }, Duplikat: { skipped: true, reason: 'duplicate event_id', original: 'evt_' + (90412 - le.i - 3) } };
-      const EX = { Gagal: ['Nomor telepon pelanggan tidak valid', 'Meta menolak karena nomor kosong atau formatnya salah sebelum di-hash. Event ini tidak diulang otomatis.', ['Pastikan nomor diawali 62, tanpa spasi atau tanda +.', 'Perbaiki data kontak, lalu klik Kirim ulang.']], Retry: ['Meta sedang membatasi permintaan', 'Terlalu banyak event dalam waktu singkat. Convera mencoba lagi otomatis — kamu tidak perlu melakukan apa-apa.', ['Percobaan berikutnya dalam ±2 menit (3 dari 5).']], Kedaluwarsa: ['Lewat batas 7 hari sejak klik iklan', 'Meta hanya menerima konversi CTWA maksimal 7 hari setelah klik. Event ini tidak bisa dikirim ulang.', ['Tandai Purchase lebih cepat dari halaman Leads.', 'Aktifkan Aturan Otomatis agar closing tercatat seketika.']], Duplikat: ['Event yang sama sudah pernah dikirim', 'event_id ini sudah terkirim sebelumnya, jadi dilewati agar konversi tidak dihitung dua kali.', ['Tidak perlu tindakan.']] }[le.st];
+      const EX = { Gagal: ['Nomor telepon pelanggan tidak valid', 'Meta menolak karena nomor kosong atau formatnya salah sebelum di-hash. Event ini tidak diulang otomatis.', ['Pastikan nomor diawali 62, tanpa spasi atau tanda +.', 'Perbaiki data kontak, lalu klik Kirim ulang.']], Retry: ['Meta sedang membatasi permintaan', 'Terlalu banyak event dalam waktu singkat. Convera mencoba lagi otomatis — kamu tidak perlu melakukan apa-apa.', ['Percobaan berikutnya dalam ±2 menit (3 dari 5).']], Kedaluwarsa: ['Lewat batas 7 hari sejak klik iklan', 'Meta hanya menerima konversi CTWA maksimal 7 hari setelah klik. Event ini tidak bisa dikirim ulang.', ['Tandai Purchase lebih cepat dari halaman Leads.', 'Aktifkan Event agar closing tercatat seketika.']], Duplikat: ['Event yang sama sudah pernah dikirim', 'event_id ini sudah terkirim sebelumnya, jadi dilewati agar konversi tidak dihitung dua kali.', ['Tidak perlu tindakan.']] }[le.st];
       const t0 = String(le.d.getHours()).padStart(2, '0') + ':' + String(le.d.getMinutes()).padStart(2, '0');
       const RET = { Terkirim: [[t0 + ':04', '200', 'Diterima Meta · events_received: 1']], Duplikat: [[t0 + ':02', '—', 'Dilewati — event_id ' + le.order + ' sudah terkirim']], Retry: [[t0 + ':03', '429', 'Rate limit dari Meta'], [t0 + ':33', '429', 'Rate limit dari Meta'], ['Terjadwal', '—', 'Percobaan 3/5 dalam 2 menit']], Gagal: [[t0 + ':03', '400', 'Invalid parameter: user_data.ph'], [t0 + ':35', '400', 'Invalid parameter: user_data.ph'], [t0 + ':58', '400', 'Dihentikan — error permanen']], Kedaluwarsa: [[t0 + ':02', '400', 'event_time lebih dari 7 hari']] }[le.st];
       const tab = s.lgTab || 'payload';
       lgd = { open: true, close: () => set({ lgOpen: null }), id: le.id + ' · ' + le.order, ev: le.ev, st: le.st, pill: pill(EVP[le.st]),
-        tabs: [['payload', 'Payload'], ['respons', 'Respons Meta'], ['riwayat', 'Riwayat retry']].map(([k, label]) => ({ label, pick: () => set({ lgTab: k }), style: { fontFamily: 'inherit', height: 38, padding: 0, border: 'none', borderBottom: tab === k ? '2px solid var(--accent)' : '2px solid transparent', background: 'transparent', color: tab === k ? 'var(--text)' : 'var(--muted)', fontSize: 14, fontWeight: tab === k ? 700 : 500, cursor: 'pointer', whiteSpace: 'nowrap' } })),
+        tabs: [['payload', 'Payload'], ['respons', 'Respons Meta'], ['riwayat', 'Riwayat retry']].map(([k, label]) => ({ label, pick: () => set({ lgTab: k }), style: { fontFamily: 'inherit', height: 38, padding: 0, border: 'none', borderBottom: tab === k ? '2px solid var(--accent)' : '2px solid transparent', background: 'transparent', color: tab === k ? 'var(--text)' : 'var(--muted)', fontSize: 14, fontWeight: tab === k ? 500 : 400, cursor: 'pointer', whiteSpace: 'nowrap' } })),
         explain: !!EX, exTitle: EX ? EX[0] : '', exBody: EX ? EX[1] : '', tips: EX ? EX[2] : [],
         facts: [['WAKTU', tfmt(le.d) + ' WIB'], ['SUMBER', le.src], ['NILAI', le.value ? rp(le.value) : '—'], ['CTWA_CLID', le.clid]].map(([k, v]) => ({ k, v })),
         tPre: tab !== 'riwayat', pre: JSON.stringify(tab === 'payload' ? payload : RESP[le.st], null, 2), tRetry: tab === 'riwayat',
@@ -382,10 +384,10 @@ class Component extends DCLogic {
 
     // ---------- koneksi ----------
     const stP = (on) => pill(on ? 'ok' : 'err');
-    const kRow = (k, v, hi) => ({ k, v, vs: { fontWeight: 700, color: hi ? 'var(--accentText)' : 'var(--text)', textAlign: 'right' } });
+    const kRow = (k, v, hi) => ({ k, v, vs: { fontWeight: 500, color: hi ? 'var(--accentText)' : 'var(--text)', textAlign: 'right' } });
     const A = (label, go, st) => ({ label, go, style: st === 'p' ? bP : st === 'd' ? bD : bW });
     const cfOpen = (k) => set({ confirm: k });
-    const kn = { tips: [[true, 'Nomor telepon dikirim dalam format 62… (sudah)'], [false, 'Tambahkan email pelanggan bila ada (+0,6 EMQ)'], [false, 'Kirim nama depan & belakang (fn, ln)']].map(([d, text]) => ({ text, mark: d ? '✓' : '+', dot: { width: 18, height: 18, flex: 'none', borderRadius: '50%', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', background: d ? 'var(--accent)' : 'var(--neutral)', color: d ? '#fff' : 'var(--text)' } })),
+    const kn = { tips: [[true, 'Nomor telepon dikirim dalam format 62… (sudah)'], [false, 'Tambahkan email pelanggan bila ada (+0,6 EMQ)'], [false, 'Kirim nama depan & belakang (fn, ln)']].map(([d, text]) => ({ text, mark: d ? '✓' : '+', dot: { width: 18, height: 18, flex: 'none', borderRadius: '50%', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', background: d ? 'var(--accent)' : 'var(--neutral)', color: d ? '#fff' : 'var(--text)' } })),
       cards: [
         { icon: ic.meta, title: 'Meta Dataset', sub: 'Kopi Senja – WhatsApp · 1029384756102938', status: metaOn ? 'Terhubung' : 'Terputus', pill: stP(metaOn), emq: metaOn, alert: metaOn ? '' : 'Event baru tidak dikirim ke Meta sampai Dataset dihubungkan lagi.',
           rows: metaOn ? [kRow('Event diterima 7 hari', '1.204'), kRow('Masa berlaku token', tokenDays + ' hari lagi', tokenDays < 14), kRow('Test event code', 'TEST48213')] : [kRow('Terakhir aktif', '17 Okt, 14:40')],
@@ -423,11 +425,11 @@ class Component extends DCLogic {
       newKey: () => set({ keyModal: { step: 'ask', label: '' } }),
       keys: keys.map((k, i) => ({ ...k, revoke: () => { set({ keys: keys.filter((_, j) => j !== i) }); say('API key dicabut', k.label); } })),
       url: URL_, copyUrl: () => copy(URL_, 'url'), copyUrlLabel: s.copied === 'url' ? 'Tersalin' : 'Salin',
-      tabs: [['curl', 'cURL'], ['node', 'Node.js'], ['python', 'Python'], ['php', 'PHP']].map(([k, label]) => ({ label, pick: () => set({ devCode: k }), style: { fontFamily: 'inherit', height: 30, padding: '0 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', background: dc === k ? 'rgba(255,255,255,0.12)' : 'transparent', color: dc === k ? '#f3f0ea' : '#a39e95' } })),
+      tabs: [['curl', 'cURL'], ['node', 'Node.js'], ['python', 'Python'], ['php', 'PHP']].map(([k, label]) => ({ label, pick: () => set({ devCode: k }), style: { fontFamily: 'inherit', height: 30, padding: '0 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 400, whiteSpace: 'nowrap', background: dc === k ? 'rgba(255,255,255,0.12)' : 'transparent', color: dc === k ? '#f3f0ea' : '#a39e95' } })),
       code: CODES[dc], copyCode: () => copy(CODES[dc], 'code'), copyCodeLabel: s.copied === 'code' ? 'Tersalin' : 'Salin',
-      schema: [['event_name', 'Wajib', 'LeadSubmitted, Purchase, AddToCart, InitiateCheckout, atau ViewContent'], ['ctwa_clid', 'Wajib', 'Dari webhook pesan pertama (referral.ctwa_clid)'], ['value', 'Wajib*', 'Wajib untuk Purchase, AddToCart, InitiateCheckout'], ['event_id', 'Opsional', 'Untuk deduplikasi, mis. nomor order'], ['currency', 'Opsional', 'Default IDR'], ['customer.phone', 'Disarankan', 'Format 62…, di-hash SHA-256 otomatis'], ['customer.email', 'Opsional', 'Menaikkan EMQ'], ['event_time', 'Opsional', 'Unix detik, maksimal 7 hari ke belakang']].map(([k, req, d]) => ({ k, req, d, rs: { fontSize: 11, fontWeight: 700, color: req.startsWith('Wajib') ? 'var(--accentText)' : 'var(--muted)' } })),
+      schema: [['event_name', 'Wajib', 'LeadSubmitted, Purchase, AddToCart, InitiateCheckout, atau ViewContent'], ['ctwa_clid', 'Wajib', 'Dari webhook pesan pertama (referral.ctwa_clid)'], ['value', 'Wajib*', 'Wajib untuk Purchase, AddToCart, InitiateCheckout'], ['event_id', 'Opsional', 'Untuk deduplikasi, mis. nomor order'], ['currency', 'Opsional', 'Default IDR'], ['customer.phone', 'Disarankan', 'Format 62…, di-hash SHA-256 otomatis'], ['customer.email', 'Opsional', 'Menaikkan EMQ'], ['event_time', 'Opsional', 'Unix detik, maksimal 7 hari ke belakang']].map(([k, req, d]) => ({ k, req, d, rs: { fontSize: 11, fontWeight: 500, color: req.startsWith('Wajib') ? 'var(--accentText)' : 'var(--muted)' } })),
       wh: s.wh ?? 'https://n8n.kopisenja.id/webhook/convera', setWh: (e) => set({ wh: e.target.value }),
-      whEv: [['sent', 'event.sent'], ['failed', 'event.failed'], ['lead', 'lead.created'], ['quota', 'quota.warning']].map(([k, label]) => ({ label, pick: () => set({ whEv: { ...whE, [k]: !whE[k] } }), style: { ...chip(whE[k]), height: 30, fontSize: 12, fontFamily: "'JetBrains Mono',monospace" } })),
+      whEv: [['sent', 'event.sent'], ['failed', 'event.failed'], ['lead', 'lead.created'], ['quota', 'quota.warning']].map(([k, label]) => ({ label, pick: () => set({ whEv: { ...whE, [k]: !whE[k] } }), style: { ...chip(whE[k]), height: 30, fontSize: 12, fontFamily: "'Poppins',monospace" } })),
       secretMask: (s.whSecret || 'whsec_5Tq9xVb').slice(0, 9) + '…' + (s.whSecret || 'whsec_5Tq9xVb').slice(-4),
       testWh: async () => { const url = s.wh ?? 'https://n8n.kopisenja.id/webhook/convera'; say('Mengirim webhook tes…', url.replace('https://', '').split('/')[0]); let secret = s.whSecret; if (!secret) { secret = 'whsec_' + randomToken(24); set({ whSecret: secret }); } const r = await testWebhook(url, secret); say(r.ok ? 'Webhook tes terkirim' : 'Webhook gagal', r.ok ? 'HTTP ' + r.status : r.error); },
       saveWh: () => { const url = (s.wh ?? 'https://n8n.kopisenja.id/webhook/convera').trim(); if (!isHttps(url)) { say('URL webhook tidak valid', 'Harus diawali https://'); return; } if (!s.whSecret) set({ whSecret: 'whsec_' + randomToken(24) }); say('Webhook disimpan', url.replace('https://', '').split('/')[0]); } };
@@ -438,7 +440,7 @@ class Component extends DCLogic {
       done: () => { set({ keyModal: null, keys: [...keys, { label: kmS.label || 'Key baru', key: (kmS.gen || newKey).slice(0, 13) + '••••••••' + (kmS.gen || newKey).slice(-4), created: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }), used: 'Belum pernah' }] }); say('API key dibuat', kmS.label || 'Key baru'); } } : { open: false };
 
     // ---------- pengaturan ----------
-    const tabK = s.setTab || 'umum';
+    const tabK = ['umum', 'notif', 'keamanan'].includes(s.setTab) ? s.setTab : 'umum';
     const roleP = (r) => pill(r === 'Owner' ? 'ok' : r === 'Admin' ? 'accent' : r === 'CS' ? 'soft' : 'neutral');
     const members = [['Rizky Saputra', 'rizky@kopisenja.id', 'Owner', 'Aktif'], ['Dina Maharani', 'dina@kopisenja.id', 'CS', 'Aktif · 5 mnt lalu'], ['Arif Rahman', 'arif@kopisenja.id', 'Admin', 'Aktif · kemarin'], ['Lumbung Digital (agency)', 'ads@lumbungdigital.id', 'Viewer', 'Undangan terkirim'], ...(s.invites || [])];
     const bill = s.bill || 'bulanan';
@@ -450,18 +452,18 @@ class Component extends DCLogic {
     const sess = [[ic.monitor, 'Chrome · Windows', 'Jakarta · 103.47.x.x · sekarang', true], [ic.phone, 'Safari · iPhone 15', 'Jakarta · 2 jam lalu', false], [ic.monitor, 'Edge · Windows', 'Bandung · 3 hari lalu', false]].filter((_, i) => !(s.sessOut || {})[i]);
     const delOk = (s.delName || '') === WS[s.ws][0];
     const se = {
-      tabs: [['umum', 'Umum'], ['tim', 'Tim'], ['paket', 'Paket & Tagihan'], ['notif', 'Notifikasi'], ['keamanan', 'Keamanan'], ['privasi', 'Privasi & Data']].map(([k, label]) => ({ label, pick: () => set({ setTab: k }), style: { fontFamily: 'inherit', height: 34, padding: '0 14px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', background: tabK === k ? 'var(--surface)' : 'transparent', color: tabK === k ? 'var(--text)' : 'var(--muted)' } })),
+      tabs: [['umum', 'Umum'], ['notif', 'Notifikasi'], ['keamanan', 'Keamanan']].map(([k, label]) => ({ label, pick: () => set({ setTab: k }), style: { fontFamily: 'inherit', height: 34, padding: '0 14px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', background: tabK === k ? 'var(--surface)' : 'transparent', color: tabK === k ? 'var(--text)' : 'var(--muted)' } })),
       umum: tabK === 'umum', tim: tabK === 'tim', paket: tabK === 'paket', notif: tabK === 'notif', keamanan: tabK === 'keamanan', privasi: tabK === 'privasi',
       defEv: s.defEv || 'Purchase', setDefEv: (e) => set({ defEv: e.target.value }), defVal: s.defVal ?? '150.000', setDefVal: (e) => { const d = e.target.value.replace(/\D/g, ''); set({ defVal: d ? Number(d).toLocaleString('id-ID') : '' }); }, saveUmum: () => { if (!(s.f.biz || '').trim()) { say('Nama bisnis wajib diisi'); return; } say('Pengaturan disimpan', s.f.biz); },
       retention: s.retention || '90 hari', setRetention: (e) => set({ retention: e.target.value }),
       invEmail: s.invEmail || '', setInvEmail: (e) => set({ invEmail: e.target.value }), invRole: s.invRole || 'CS', setInvRole: (e) => set({ invRole: e.target.value }),
       invite: () => { const em = (s.invEmail || '').trim(); if (!/.+@.+\..+/.test(em)) { say('Email belum valid'); return; } set({ invites: [...(s.invites || []), [em.split('@')[0], em, s.invRole || 'CS', 'Undangan terkirim']], invEmail: '' }); say('Undangan terkirim', em); },
       members: members.map(([name, email, role, state]) => ({ name, email, role, state, ini: ini(name), ps: roleP(role) })),
-      perms: [['Lihat dashboard & laporan', 1, 1, 1, 1], ['Tandai Purchase di Leads', 1, 1, 1, 0], ['Kelola aturan otomatis', 1, 1, 0, 0], ['Kelola koneksi & API key', 1, 1, 0, 0], ['Undang & atur anggota', 1, 1, 0, 0], ['Paket, tagihan & hapus workspace', 1, 0, 0, 0]].map(([label, ...c]) => ({ label, cells: c.map((v) => ({ t: v ? '✓' : '—', s: { textAlign: 'center', fontWeight: 800, color: v ? 'var(--accentText)' : 'var(--borderStrong)' } })) })),
-      planName: curPlan ? 'Paket ' + curPlan : 'Trial Growth', planState: curPlan ? 'Aktif' : 'Sisa 9 hari', planPill: pill(curPlan ? 'ok' : 'soft'), planSub: curPlan ? 'Diperpanjang otomatis 17 Nov 2026 · QRIS' : 'Berakhir 26 Okt 2026. Pilih paket agar ROAS & Aturan Otomatis tetap aktif.',
-      billTabs: [['bulanan', 'Bulanan'], ['tahunan', 'Tahunan · hemat 2 bulan']].map(([k, label]) => ({ label, pick: () => set({ bill: k }), style: { fontFamily: 'inherit', height: 32, padding: '0 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', background: bill === k ? 'var(--surface)' : 'transparent', color: bill === k ? 'var(--text)' : 'var(--muted)' } })),
-      plans: PLANS.map(([name, price, quota, feats]) => { const hi = name === 'Growth'; const cur = curPlan === name; return { name, quota, price: rp(priceOf(price)), per: bill === 'tahunan' ? '/ tahun' : '/ bulan', tag: hi ? 'POPULER' : '', tagStyle: { fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', padding: '3px 8px', borderRadius: 999, background: 'var(--accent)', color: '#fff' },
-        features: feats.map((t) => ({ t, ts: { color: hi ? 'var(--accent)' : 'var(--accentText)', fontWeight: 800 } })),
+      perms: [['Lihat dashboard & laporan', 1, 1, 1, 1], ['Tandai Purchase di Leads', 1, 1, 1, 0], ['Kelola aturan otomatis', 1, 1, 0, 0], ['Kelola koneksi & API key', 1, 1, 0, 0], ['Undang & atur anggota', 1, 1, 0, 0], ['Paket, tagihan & hapus workspace', 1, 0, 0, 0]].map(([label, ...c]) => ({ label, cells: c.map((v) => ({ t: v ? '✓' : '—', s: { textAlign: 'center', fontWeight: 600, color: v ? 'var(--accentText)' : 'var(--borderStrong)' } })) })),
+      planName: curPlan ? 'Paket ' + curPlan : 'Trial Growth', planState: curPlan ? 'Aktif' : 'Sisa 9 hari', planPill: pill(curPlan ? 'ok' : 'soft'), planSub: curPlan ? 'Diperpanjang otomatis 17 Nov 2026 · QRIS' : 'Berakhir 26 Okt 2026. Pilih paket agar ROAS & Event tetap aktif.',
+      billTabs: [['bulanan', 'Bulanan'], ['tahunan', 'Tahunan · hemat 2 bulan']].map(([k, label]) => ({ label, pick: () => set({ bill: k }), style: { fontFamily: 'inherit', height: 32, padding: '0 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', background: bill === k ? 'var(--surface)' : 'transparent', color: bill === k ? 'var(--text)' : 'var(--muted)' } })),
+      plans: PLANS.map(([name, price, quota, feats]) => { const hi = name === 'Growth'; const cur = curPlan === name; return { name, quota, price: rp(priceOf(price)), per: bill === 'tahunan' ? '/ tahun' : '/ bulan', tag: hi ? 'POPULER' : '', tagStyle: { fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', padding: '3px 8px', borderRadius: 999, background: 'var(--accent)', color: '#fff' },
+        features: feats.map((t) => ({ t, ts: { color: hi ? 'var(--accent)' : 'var(--accentText)', fontWeight: 600 } })),
         card: { display: 'flex', flexDirection: 'column', gap: 14, padding: 22, borderRadius: 14, background: hi ? 'var(--ink)' : 'var(--surface2)', color: hi ? 'var(--inkText)' : 'var(--text)', minHeight: 320 },
         btnLabel: cur ? 'Paket aktif' : 'Pilih ' + name, btn: { ...BTN, height: 44, width: '100%', background: cur ? 'transparent' : hi ? 'var(--accent)' : 'var(--surface)', color: cur ? 'inherit' : hi ? '#fff' : 'var(--text)', cursor: cur ? 'default' : 'pointer' },
         choose: () => !cur && set({ checkout: { plan: name, price: priceOf(price), step: 'pay', method: 'qris' } }) }; }),
@@ -484,7 +486,7 @@ class Component extends DCLogic {
       const uC = (o) => set({ checkout: { ...coS, ...o } });
       co = { open: true, title: coS.step === 'done' ? 'Paket ' + coS.plan : 'Checkout · Paket ' + coS.plan, close: () => { clearInterval(this.iv); set({ checkout: null }); }, total,
         sPay: coS.step === 'pay', sQris: coS.step === 'qris', sVa: coS.step === 'va', sDone: coS.step === 'done',
-        lines: [['Paket ' + coS.plan + ' · ' + bill, rp(coS.price)], ['PPN 11%', rp(tax)], ['Total', total]].map(([k, v], i) => ({ k, v, s: { display: 'flex', justifyContent: 'space-between', gap: 12, color: 'var(--text)', fontWeight: i === 2 ? 800 : 500, fontSize: i === 2 ? 15 : 13, paddingTop: i === 2 ? 8 : 0, borderTop: i === 2 ? '1px solid var(--bg)' : 'none' } })),
+        lines: [['Paket ' + coS.plan + ' · ' + bill, rp(coS.price)], ['PPN 11%', rp(tax)], ['Total', total]].map(([k, v], i) => ({ k, v, s: { display: 'flex', justifyContent: 'space-between', gap: 12, color: 'var(--text)', fontWeight: i === 2 ? 600 : 400, fontSize: i === 2 ? 15 : 13, paddingTop: i === 2 ? 8 : 0, borderTop: i === 2 ? '1px solid var(--bg)' : 'none' } })),
         methods: [['qris', 'QRIS', 'GoPay, OVO, DANA, ShopeePay, m-banking'], ['va', 'Virtual Account', 'BCA, Mandiri, BNI, BRI'], ['card', 'Kartu kredit / debit', 'Visa, Mastercard, JCB']].map(([k, label, desc]) => { const on = coS.method === k; return { label, desc, pick: () => uC({ method: k }), style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 16px', borderRadius: 12, border: 'none', cursor: 'pointer', background: on ? 'var(--accentSoft)' : 'var(--surface2)', boxShadow: on ? 'inset 0 0 0 2px var(--accent)' : 'none' }, radio: { width: 18, height: 18, flex: 'none', borderRadius: '50%', background: on ? 'var(--accent)' : 'var(--surface)', boxShadow: on ? 'inset 0 0 0 4px var(--surface)' : 'inset 0 0 0 1.5px var(--borderStrong)' } }; }),
         pay: () => { if (coS.method === 'qris') { uC({ step: 'qris', start: Date.now() }); clearInterval(this.iv); this.iv = setInterval(() => this.forceUpdate(), 1000); } else if (coS.method === 'va') uC({ step: 'va' }); else { set({ checkout: { ...coS, step: 'done' }, plan: coS.plan }); } },
         timer: String(Math.floor(left / 60)).padStart(2, '0') + ':' + String(left % 60).padStart(2, '0'), back: () => { clearInterval(this.iv); uC({ step: 'pay' }); },
@@ -509,7 +511,7 @@ class Component extends DCLogic {
     const dark = s.dark ?? P.dark ?? false;
     const screen = s.screen ?? P.startScreen ?? 'app';
     const ic = this.icons();
-    const rootStyle = { ...this.theme(dark, P.accent ?? 'orange', P.statusStyle ?? 'brand'), background: 'var(--bg)', color: 'var(--text)', minHeight: '100vh', fontFamily: "'Plus Jakarta Sans',sans-serif" };
+    const rootStyle = { ...this.theme(dark, P.accent ?? 'orange', P.statusStyle ?? 'brand'), background: 'var(--bg)', color: 'var(--text)', minHeight: '100vh', fontFamily: "'Poppins',sans-serif" };
     const W = s.width, mobile = W < 768, wide = W >= 1024;
     const common = { rootStyle, ic, toggleDark: () => this.setState({ dark: !dark, menu: null }), darkLabel: dark ? 'Mode terang' : 'Mode gelap', darkIcon: dark ? ic.sun : ic.moon, isOnboarding: screen === 'onboarding', isApp: screen === 'app' };
 
@@ -525,9 +527,9 @@ class Component extends DCLogic {
     const obSteps = STEPS.map(([label, desc], i) => {
       const done = i < s.step, cur = i === s.step;
       return { label, desc, num: done ? '✓' : String(i + 1), line: i < 4, go: () => this.setState({ step: i }),
-        numStyle: { width: 28, height: 28, borderRadius: '50%', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, background: done ? 'var(--accent)' : cur ? 'var(--text)' : 'var(--neutral)', color: done || cur ? 'var(--surface)' : 'var(--muted)', border: 'none' },
+        numStyle: { width: 28, height: 28, borderRadius: '50%', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, background: done ? 'var(--accent)' : cur ? 'var(--text)' : 'var(--neutral)', color: done || cur ? 'var(--surface)' : 'var(--muted)', border: 'none' },
         lineStyle: { width: 2, flex: 1, minHeight: 22, background: done ? 'var(--accent)' : 'var(--border)', margin: '4px 0' },
-        labelStyle: { fontSize: 14, fontWeight: cur ? 800 : 600, color: cur || done ? 'var(--text)' : 'var(--muted)' } };
+        labelStyle: { fontSize: 14, fontWeight: cur ? 600 : 400, color: cur || done ? 'var(--text)' : 'var(--muted)' } };
     });
     const setF = (k) => (e) => { const v = e.target.value; this.setState((st) => ({ f: { ...st.f, [k]: v }, test: k === 'token' || k === 'dataset' ? 'idle' : st.test })); };
     const on = {}; Object.keys(s.f).forEach((k) => (on[k] = setF(k)));
@@ -547,7 +549,7 @@ class Component extends DCLogic {
     const nMethods = Object.values(s.methods).filter(Boolean).length;
     const metaOk = s.test === 'ok', waOk = s.wa === 'cloud' ? !!(s.f.phoneId && s.f.waba && s.f.waToken) : false;
     const ck = (title, desc, state, step) => ({ title, desc, fix: state !== 'ok', go: () => this.setState({ step }), mark: state === 'ok' ? ic.check : state === 'pending' ? '…' : '!',
-      dot: { width: 28, height: 28, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, background: state === 'ok' ? 'var(--okBg)' : state === 'pending' ? 'var(--warnBg)' : 'var(--errBg)', color: state === 'ok' ? 'var(--okFg)' : state === 'pending' ? 'var(--warnFg)' : 'var(--errFg)' } });
+      dot: { width: 28, height: 28, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, background: state === 'ok' ? 'var(--okBg)' : state === 'pending' ? 'var(--warnBg)' : 'var(--errBg)', color: state === 'ok' ? 'var(--okFg)' : state === 'pending' ? 'var(--warnFg)' : 'var(--errFg)' } });
     const checklist = [
       ck('Workspace “' + (s.f.biz || 'Tanpa nama') + '”', s.f.industry + ' · IDR · ' + s.f.tz.split(' ')[0], s.f.biz ? 'ok' : 'err', 0),
       ck('Meta Dataset', metaOk ? 'Terhubung · EMQ 7,8' : 'Belum dites — klik Tes Koneksi', metaOk ? 'ok' : 'err', 1),
@@ -555,7 +557,7 @@ class Component extends DCLogic {
       ck('Cara kirim konversi', nMethods ? M.filter(([id]) => s.methods[id]).map(([, t]) => t.split(' ')[0] === 'API' ? 'API' : t.split(' ')[0] === 'Tandai' ? 'Manual' : 'Otomatis').join(' · ') : 'Belum dipilih', nMethods ? 'ok' : 'err', 3),
     ];
     const sendDone = s.send === 'done';
-    const btnBase = { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8, height: 46, padding: '0 20px', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' };
+    const btnBase = { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8, height: 46, padding: '0 20px', borderRadius: 10, fontSize: 15, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' };
     const nextDisabled = s.step === 3 && nMethods === 0;
     const onboarding = {
       wide, narrowOb: !wide, obSteps, stepNo: s.step + 1, obKicker: HEAD[s.step][0], obTitle: HEAD[s.step][1], obSub: HEAD[s.step][2],
@@ -585,26 +587,22 @@ class Component extends DCLogic {
     const collapsed = mobile ? false : (s.collapsed ?? W < 1100);
     const expanded = !collapsed;
     const NAV = [
-      ['overview', 'Overview', 'dash', null, null, 'Ringkasan performa iklan WhatsApp dan kesehatan sistem.', 3],
-      ['leads', 'Leads', 'users', null, null, 'Semua chat dari iklan CTWA, lengkap dengan kampanye asal dan sisa waktu atribusi.', 4],
-      ['konversi', 'Konversi', 'bag', null, null, 'Purchase dan event lain yang sudah dikirim ke Meta.', 4],
-      ['performa', 'Performa Iklan', 'bars', 'GROWTH', null, 'Spend, Purchase, dan ROAS per kampanye, ad set, dan iklan.', 7],
-      ['aturan', 'Aturan Otomatis', 'zap', 'GROWTH', null, 'Kirim event otomatis berdasarkan kata kunci atau template pesan.', 7],
-      ['log', 'Log Event', 'list', null, 'DATA', 'Catatan teknis setiap event yang dikirim ke Meta CAPI.', 5],
-      ['laporan', 'Laporan', 'file', 'GROWTH', null, 'Unduh atau jadwalkan laporan mingguan ke email & WhatsApp.', 7],
-      ['koneksi', 'Koneksi', 'link', null, 'PENGATURAN', 'Status Meta Dataset, Ad Account, dan nomor WhatsApp.', 5],
-      ['integrasi', 'Integrasi', 'blocks', null, null, 'Hubungkan Google Sheets, n8n, form order, dan lainnya.', 5],
-      ['developer', 'Developer', 'code', null, null, 'API key, endpoint, contoh kode, dan webhook.', 5],
-      ['pengaturan', 'Pengaturan', 'sliders', null, null, 'Workspace, tim, paket & tagihan, notifikasi, dan keamanan.', 6],
-      ['agency', 'Semua Workspace', 'grid', 'AGENCY', null, 'Ringkasan semua bisnis klien dalam satu layar.', 7],
+      ['overview', 'Overview', 'dash', null, null, '', 3],
+      ['leads', 'Leads', 'users', null, null, '', 4],
+      ['konversi', 'Konversi', 'bag', null, null, '', 4],      ['aturan', 'Event', 'zap', 'GROWTH', null, '', 7],
+      ['log', 'Log Event', 'list', null, 'DATA', '', 5],
+      ['laporan', 'Laporan', 'file', 'GROWTH', null, '', 7],
+      ['koneksi', 'Koneksi', 'link', null, 'PENGATURAN', '', 5],
+      ['pengaturan', 'Pengaturan', 'sliders', null, null, '', 6],
+      ['agency', 'Semua Workspace', 'grid', 'AGENCY', null, '', 7],
     ];
     const navItem = (id, label, iconKey, badge, group) => {
       const a = s.page === id;
       return { label, icon: ic[iconKey], badge: expanded ? badge : null, group: expanded ? group : (group ? ' ' : null), showLabel: expanded,
         alert: id === 'koneksi', alertStyle: { width: 7, height: 7, borderRadius: '50%', background: 'var(--errDotStrong)', flex: 'none', ...(collapsed ? { position: 'absolute', top: 8, right: 10 } : {}) },
-        groupStyle: expanded ? { fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--muted)', padding: '14px 10px 6px' } : { display: 'block', height: 1, background: 'var(--border)', margin: '10px 8px' },
+        groupStyle: expanded ? { fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', color: 'var(--muted)', padding: '14px 10px 6px' } : { display: 'block', height: 1, background: 'var(--border)', margin: '10px 8px' },
         go: () => this.setState({ page: id, menu: null, more: false }),
-        style: { fontFamily: 'inherit', position: 'relative', display: 'flex', alignItems: 'center', gap: 12, width: '100%', height: 40, padding: collapsed ? 0 : '0 10px', justifyContent: collapsed ? 'center' : 'flex-start', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: a ? 700 : 500, textAlign: 'left', background: a ? 'var(--accentSoft)' : 'transparent', color: a ? 'var(--accentText)' : 'var(--muted)', flex: 'none' } };
+        style: { fontFamily: 'inherit', position: 'relative', display: 'flex', alignItems: 'center', gap: 12, width: '100%', height: 40, padding: collapsed ? 0 : '0 10px', justifyContent: collapsed ? 'center' : 'flex-start', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: a ? 500 : 400, textAlign: 'left', background: a ? 'var(--accentSoft)' : 'transparent', color: a ? 'var(--accentText)' : 'var(--muted)', flex: 'none' } };
     };
     const nav = NAV.filter(([id]) => id !== 'agency').map(([id, l, i, b, g]) => navItem(id, l, i, b, g));
     const sidebarStyle = { width: collapsed ? 76 : 264, flex: 'none', position: 'sticky', top: 0, height: '100vh', display: 'flex', flexDirection: 'column', gap: 16, padding: collapsed ? '18px 12px' : '18px 14px', background: 'var(--surface)', borderRight: '1px solid var(--border)', transition: 'width .2s', zIndex: 32 };
@@ -616,7 +614,7 @@ class Component extends DCLogic {
       style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', background: w.i === s.ws ? 'var(--surface2)' : 'transparent' } }));
     const menu = (m) => () => this.setState({ menu: s.menu === m ? null : m });
     const PRE = [['Hari ini', '17 Okt'], ['Kemarin', '16 Okt'], ['7 hari terakhir', '11–17 Okt'], ['30 hari terakhir', '18 Sep–17 Okt'], ['Bulan ini', '1–17 Okt'], ['Bulan lalu', 'Sep 2026']];
-    const presets = PRE.map(([label, hint], i) => ({ label, hint, pick: () => this.setState({ range: i, menu: null }), style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: i === s.range ? 700 : 500, background: i === s.range ? 'var(--accentSoft)' : 'transparent', color: i === s.range ? 'var(--accentText)' : 'var(--text)' } }));
+    const presets = PRE.map(([label, hint], i) => ({ label, hint, pick: () => this.setState({ range: i, menu: null }), style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: i === s.range ? 500 : 400, background: i === s.range ? 'var(--accentSoft)' : 'transparent', color: i === s.range ? 'var(--accentText)' : 'var(--text)' } }));
     const NOT = [['err', 'alert', 'WhatsApp +62 812-•••-7890 terputus. Event dari nomor ini ditahan.', '2 jam lalu'], ['warn', 'clock', 'Token Meta kedaluwarsa dalam 5 hari.', '5 jam lalu'], ['ok', 'bag', '48 Purchase terkirim kemarin · Rp 21.300.000', 'Kemarin, 08.00'], ['info', 'users', 'Dina (CS) bergabung ke workspace Kopi Senja.', '2 hari lalu']];
     const tone = { err: ['var(--errBg)', 'var(--errFg)'], warn: ['var(--warnBg)', 'var(--warnFg)'], ok: ['var(--okBg)', 'var(--okFg)'], info: ['var(--neutral)', 'var(--text)'] };
     const notifs = NOT.map(([t, i, title, time], k) => ({ title, time, icon: ic[i], unread: !s.read && k < 3,
@@ -625,11 +623,10 @@ class Component extends DCLogic {
     const BAN = [
       ['wa', 'err', 'WhatsApp +62 812-•••-7890 terputus.', 'Event dari nomor ini ditahan sampai terhubung lagi.', 'Hubungkan ulang', 'koneksi'],
       ['token', 'warn', 'Token Meta kedaluwarsa dalam 5 hari.', 'Event berhenti terkirim setelah 22 Okt.', 'Ganti token', 'koneksi'],
-      ['quota', 'warn', 'Kuota event 86% terpakai.', 'Event di atas kuota tetap tercatat tapi tidak dikirim ke Meta.', 'Upgrade', 'pengaturan'],
-      ['trial', 'info', 'Trial Growth tersisa 9 hari.', 'Pilih paket agar fitur ROAS & Aturan Otomatis tetap aktif.', 'Pilih paket', 'pengaturan'],
+      ['trial', 'info', 'Trial Growth tersisa 9 hari.', 'Pilih paket agar fitur ROAS & Event tetap aktif.', 'Pilih paket', 'pengaturan'],
     ].filter(([k]) => s.banners[k]);
-    const bStyle = { err: ['var(--accent)', '#1d1c1a'], warn: ['var(--accentSoft)', 'var(--accentText)'], info: ['var(--neutral)', 'var(--text)'] };
-    const banners = BAN.slice(0, 2).map(([k, t, title, body, cta, page]) => ({ title, body, cta, icon: t === 'info' ? ic.clock : ic.alert,
+    const bStyle = { err: ['var(--errBg)', 'var(--text)'], warn: ['var(--accentSoft)', 'var(--accentText)'], info: ['var(--neutral)', 'var(--text)'] };
+    const banners = BAN.slice(0, 1).map(([k, t, title, body, cta, page]) => ({ title, body: '', cta, icon: t === 'info' ? ic.clock : ic.alert,
       act: () => this.setState({ page }), close: () => this.setState((st) => ({ banners: { ...st.banners, [k]: false } })),
       style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '10px 10px 10px 14px', borderRadius: 12, background: bStyle[t][0], ...(t === 'err' ? { '--text': '#1d1c1a', '--surface': '#ffffff', '--muted': '#1d1c1a' } : {}) },
       iconStyle: { display: 'flex', flex: 'none', color: bStyle[t][1] } }));
@@ -637,16 +634,16 @@ class Component extends DCLogic {
     const MOB = [['overview', 'Overview', 'dash'], ['leads', 'Leads', 'users'], ['konversi', 'Konversi', 'bag'], ['more', 'Lainnya', 'more']];
     const bottomNav = MOB.map(([id, label, i]) => { const a = id === 'more' ? s.more || !['overview', 'leads', 'konversi'].includes(s.page) : s.page === id; return { label, icon: ic[i],
       go: () => (id === 'more' ? this.setState({ more: true }) : this.setState({ page: id, more: false })),
-      style: { fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: a ? 800 : 600, color: a ? 'var(--accentText)' : 'var(--muted)' } }; });
+      style: { fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: a ? 600 : 400, color: a ? 'var(--accentText)' : 'var(--muted)' } }; });
     const moreNav = NAV.filter(([id]) => !['overview', 'leads', 'konversi'].includes(id)).map(([id, label, i, badge]) => ({ label, badge, icon: ic[i], go: () => this.setState({ page: id, more: false }),
-      style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 10, height: 48, padding: '0 12px', borderRadius: 10, border: '1px solid var(--border)', background: s.page === id ? 'var(--accentSoft)' : 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer' } }));
+      style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 10, height: 48, padding: '0 12px', borderRadius: 10, border: '1px solid var(--border)', background: s.page === id ? 'var(--accentSoft)' : 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 400, cursor: 'pointer' } }));
     const app = {
       mobile, notMobile: !mobile, wideTop: W >= 1180, showSidebar: !mobile, expanded, collapsedQuota: collapsed, sidebarStyle,
       sbHeadStyle: { display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', flexDirection: collapsed ? 'column' : 'row', gap: 10, padding: collapsed ? 0 : '2px 4px 2px 6px' },
       toggleCollapse: () => this.setState({ collapsed: !collapsed }),
       wsName: WS[s.ws][0], wsMeta: WS[s.ws][1] + ' · Growth', wsInitial: WS[s.ws][0].charAt(0),
       wsBtnStyle: { fontFamily: 'inherit', width: '100%', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 10, padding: collapsed ? 6 : '8px 10px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface2)', cursor: 'pointer' },
-      openWs: menu('ws'), wsMenu: s.menu === 'ws', wsQuery: s.wsQuery, onWsQuery: (e) => this.setState({ wsQuery: e.target.value }), wsList, wsEmpty: wsList.length === 0,
+      openWs: menu('ws'), wsMenu: s.menu === 'ws', wsQuery: s.wsQuery, onWsQuery: (e) => this.setState({ wsQuery: e.target.value }), wsList, wsAll: WS.map(([name, meta]) => ({ name, meta })), wsEmpty: wsList.length === 0,
       newWs: () => this.setState({ screen: 'onboarding', step: 0, menu: null, test: 'idle', send: 'idle' }), allWs: () => this.setState({ page: 'agency', menu: null }),
       nav, menuOpen: false, closeMenus: () => this.setState({ menu: null }),
       openDate: menu('date'), dateMenu: s.menu === 'date', dateLabel: PRE[s.range][0] + (W >= 1280 ? ' · ' + PRE[s.range][1] : ''), presets,
@@ -655,7 +652,7 @@ class Component extends DCLogic {
       notifPanelStyle: { position: mobile ? 'fixed' : 'absolute', top: mobile ? 70 : 'calc(100% + 6px)', right: mobile ? 12 : 0, left: mobile ? 12 : 'auto', width: mobile ? 'auto' : 360, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 20px 44px -18px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
       openHelp: menu('help'), helpMenu: s.menu === 'help', openUser: menu('user'), userMenu: s.menu === 'user',
       goOnboarding: () => this.setState({ screen: 'onboarding', menu: null }),
-      banners, moreBanners: BAN.length > 2 ? BAN.length - 2 : 0,
+      banners, moreBanners: BAN.length > 1 ? BAN.length - 1 : 0,
       pageTitle: page[1], pageBadge: page[3], pageDesc: page[5], pagePhase: page[6],
       mainStyle: { padding: mobile ? '18px 16px 96px' : '24px 28px 48px', display: 'flex', flexDirection: 'column', gap: 18, width: '100%', maxWidth: 1440 },
       skel4: [1, 2, 3, 4], skelRows: [1, 2, 3, 4, 5].map((k) => ({ a: { width: 120 + ((k * 37) % 80), height: 12, borderRadius: 6, background: 'var(--neutral)' }, b: { width: 70 + ((k * 23) % 40), height: 12, borderRadius: 6, background: 'var(--neutral)' } })),
