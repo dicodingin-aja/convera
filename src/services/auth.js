@@ -4,7 +4,7 @@ import { ENDPOINTS } from './backend.js';
 import { isEmail } from './validators.js';
 
 // Sesi login. Mode demo (VITE_BACKEND_ENABLED=false): sesi disimpan di localStorage dan
-// kredensial TIDAK diverifikasi ke server. Mode backend: POST/DELETE /api/v1/auth/session.
+// kredensial TIDAK diverifikasi ke server. Mode backend: POST /api/v1/auth/login dan POST /api/v1/auth/logout.
 const KEY = 'convera:auth';
 
 export function getSession() {
@@ -22,7 +22,7 @@ export async function login(email, password) {
   if (!password) throw new Error('Password wajib diisi');
   let user;
   if (appConfig.backendEnabled) {
-    const res = await requestJson(ENDPOINTS.session, { method: 'POST', body: JSON.stringify({ email, password }) });
+    const res = await requestJson(ENDPOINTS.login, { method: 'POST', body: JSON.stringify({ email, password }) });
     user = res?.data?.user || res?.user || { email };
   } else {
     if (password.length < 6) throw new Error('Password minimal 6 karakter');
@@ -34,7 +34,7 @@ export async function login(email, password) {
 }
 
 export async function logout() {
-  if (appConfig.backendEnabled) { try { await requestJson(ENDPOINTS.session, { method: 'DELETE' }); } catch {} }
+  if (appConfig.backendEnabled) { try { await requestJson(ENDPOINTS.logout, { method: 'POST' }); } catch {} }
   try { localStorage.removeItem(KEY); } catch {}
 }
 
