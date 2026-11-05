@@ -1,0 +1,122 @@
+# Jalankan dari folder deploy/ :  docker compose up -d --build
+# Hanya Caddy yang membuka port ke internet (80 dan 443). Database dan API tidak terbuka.
+name: convera
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: convera
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di deploy/.env}
+      POSTGRES_DB: db_convera
+    volumes:
+      - dbdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U convera -d db_convera"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Berjalan sekali: membuat/menaikkan skema database, lalu selesai.
+  migrate:
+    build: { context: ../backend }
+    entrypoint: ["/app/migrate"]
+    command: ["up"]
+    environment:
+      DATABASE_URL: postgres://convera:${POSTGRES_PASSWORD}@db:5432/db_convera?sslmode=disable
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    build: { context: ../backend }
+    restart: unless-stopped
+    volumes:
+      - uploads:/data/uploads   # bukti transfer (privat; API admin membaca volume yang sama)
+    environment: &backend-env
+      DATABASE_URL: postgres://convera:${POSTGRES_PASSWORD}@db:5432/db_convera?sslmode=disable
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?isi ENCRYPTION_KEY di deploy/.env}
+      GRAPH_API_VERSION: ${GRAPH_API_VERSION:?isi GRAPH_API_VERSION di deploy/.env}
+      API_ADDR: ":8080"
+      ALLOWED_ORIGINS: https://${APP_DOMAIN}
+      COOKIE_SECURE: "true"
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      WEBHOOK_BASE: https://${API_DOMAIN}/webhook
+      GIN_MODE: release
+      UPLOAD_DIR: /data/uploads
+      APP_URL: https://${APP_DOMAIN}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-Convera <no-reply@localhost>}
+      QR_SERVICE_URL: http://waqr:8090
+      QR_SERVICE_TOKEN: ${QR_SERVICE_TOKEN:?isi QR_SERVICE_TOKEN di deploy/.env (min. 16 karakter acak)}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  # API internal Convera Admin. Tidak dipublikasikan langsung: hanya Caddy (ADMIN_DOMAIN) yang meneruskan /api/admin/*.
+  admin:
+    build: { context: ../backend }
+    entrypoint: ["/app/admin"]
+    restart: unless-stopped
+    volumes:
+      - uploads:/data/uploads:ro
+    environment:
+      <<: *backend-env
+      ADMIN_ADDR: ":8081"
+      ALLOWED_ORIGINS: https://${ADMIN_DOMAIN}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    build: { context: ../backend }
+    entrypoint: ["/app/worker"]
+    restart: unless-stopped
+    environment: *backend-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  # Sesi WhatsApp Web (mode QR). Hanya terjangkau dari jaringan Docker internal; tidak ada port yang dipublikasikan.
+  waqr:
+    build: { context: ../backend }
+    entrypoint: ["/app/waqr"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://convera:${POSTGRES_PASSWORD}@db:5432/db_convera?sslmode=disable
+      QR_SERVICE_TOKEN: ${QR_SERVICE_TOKEN:?isi QR_SERVICE_TOKEN di deploy/.env}
+      CONVERA_API_URL: http://api:8080
+      QR_SERVICE_ADDR: ":8090"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        VITE_API_BASE_URL: https://${API_DOMAIN}
+        VITE_WEBHOOK_BASE: https://${API_DOMAIN}/webhook
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?isi APP_DOMAIN di deploy/.env}
+      API_DOMAIN: ${API_DOMAIN:?isi API_DOMAIN di deploy/.env}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:?isi ADMIN_DOMAIN di deploy/.env}
+      ADMIN_ALLOW_IPS: ${ADMIN_ALLOW_IPS:-0.0.0.0/0 ::/0}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - admin
+
+volumes:
+  dbdata:
+  uploads:
+  caddy_data:
+  caddy_config:

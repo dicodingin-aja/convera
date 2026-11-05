@@ -1,0 +1,31 @@
+# Membangun frontend customer lalu menyajikannya dengan Caddy (HTTPS otomatis).
+# Context = root repo (folder convera/). Dipanggil lewat deploy/docker-compose.yml.
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY index.html vite.config.js ./
+COPY public ./public
+COPY src ./src
+# Nilai ini ikut tertanam di JavaScript yang dikirim ke browser: jangan taruh rahasia di sini.
+ARG VITE_API_BASE_URL
+ARG VITE_WEBHOOK_BASE
+ENV VITE_BACKEND_ENABLED=true \
+    VITE_LIVE_API=false \
+    VITE_API_BASE_URL=${VITE_API_BASE_URL} \
+    VITE_WEBHOOK_BASE=${VITE_WEBHOOK_BASE}
+RUN npm run build
+
+# Convera Admin (UI internal). Memanggil API admin di origin yang sama (/api/admin), jadi tanpa variabel build.
+FROM node:22-alpine AS build-admin
+WORKDIR /app
+COPY admin/package.json admin/package-lock.json ./
+RUN npm ci
+COPY admin/index.html admin/vite.config.js ./
+COPY admin/src ./src
+RUN npm run build
+
+FROM caddy:2-alpine
+COPY --from=build /app/dist /srv/app
+COPY --from=build-admin /app/dist /srv/admin
+COPY deploy/Caddyfile /etc/caddy/Caddyfile

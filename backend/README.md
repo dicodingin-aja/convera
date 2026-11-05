@@ -29,6 +29,25 @@ Backend Go + Gin untuk webapp customer dan Convera Admin. Saat ini baru berisi *
    Database juga bisa dibuat manual di pgAdmin (nama `db_convera`, encoding UTF8), lalu cukup
    jalankan `up`.
 
+## Menjalankan API dan worker
+
+Setelah `migrate up`, isi `ENCRYPTION_KEY` dan `GRAPH_API_VERSION` di `.env` (lihat `.env.example`):
+
+```
+go run ./cmd/genkey    # cetak kunci enkripsi baru -> tempel ke ENCRYPTION_KEY
+go run ./cmd/api       # REST API di :8080  (cek: http://localhost:8080/healthz)
+go run ./cmd/worker    # kirim event 'queued' ke Meta CAPI + tugas kedaluwarsa langganan (butuh GRAPH_API_VERSION)
+go run ./cmd/admin     # API internal Convera Admin di :8081 (lihat ADMIN_API.md)
+
+# akun admin pertama (password dibaca dari stdin, min. 12 karakter):
+go run ./cmd/adminctl create boss "Nama Anda" superadmin
+```
+
+Endpoint dan alur ada di [API.md](API.md). Frontend memakainya dengan `VITE_BACKEND_ENABLED=true`
+dan `VITE_API_BASE_URL=http://localhost:8080`.
+
+Tes: `go test ./...` (tanpa database). Alur lengkap sudah diuji end-to-end terhadap PostgreSQL 18 sementara.
+
 ## Perintah migrasi
 
 | Perintah | Fungsi |
@@ -54,3 +73,7 @@ backend/
 
 Ringkasan tabel dan keputusan desain ada di [SCHEMA.md](SCHEMA.md).
 Status pekerjaan, keputusan, dan hal yang masih terbuka ada di [HANDOFF.md](HANDOFF.md).
+
+
+## Isi pesan
+Isi pesan (masuk/keluar) disimpan di `lead_messages` agar pelanggan bisa melihat percakapan lead di dashboard. Dihapus otomatis setelah 90 hari (job retensi) dan saat kontak dihapus. Cantumkan ini di Kebijakan Privasi. Nomor telepon ditampilkan penuh ke pelanggan; API admin tetap menyamarkannya.

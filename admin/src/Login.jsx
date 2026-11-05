@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { login } from './auth.js';
 import { Logo } from './Icon.jsx';
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, notice }) {
   const [user, setUser] = useState('');
   const [pw, setPw] = useState('');
   const [error, setError] = useState('');
@@ -18,7 +18,7 @@ export default function Login({ onLogin }) {
         <h2>Masuk</h2>
         <label className="f">Username<input className="input" autoFocus autoComplete="username" value={user} onChange={(e) => setUser(e.target.value)} /></label>
         <label className="f">Password<input className="input" type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} /></label>
-        {error ? <div role="alert" style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</div> : null}
+        {error || notice ? <div role="alert" style={{ color: 'var(--danger)', fontSize: 13 }}>{error || notice}</div> : null}
         <button className="btn primary" style={{ height: 44 }} disabled={busy}>{busy ? 'Memproses…' : 'Masuk'}</button>
       </form>
     </div>

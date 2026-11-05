@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { appConfig } from './services/config.js';
 import { isDatasetId, isToken } from './services/validators.js';
+import KoneksiBackend from './KoneksiBackend.jsx';
 
 export const CONN_DEFAULT = { category: 'Umum', waMode: 'Kirim.chat', waType: 'waba', pixelId: '', token: '', testCode: '', secret: '' };
 const CATEGORIES = ['Umum', 'F&B / Kuliner', 'Klinik / Kesehatan', 'Jasa', 'Pendidikan', 'Fashion', 'Properti', 'Otomotif'];
@@ -22,7 +23,12 @@ function Secret({ value, onChange, placeholder, invalid }) {
   );
 }
 
-export default function KoneksiSettings({ workspace, value, onSave }) {
+// Mode backend memakai KoneksiBackend (token disimpan terenkripsi di server, bukan di browser).
+export default function KoneksiSettings(props) {
+  return appConfig.backendEnabled ? <KoneksiBackend workspace={props.workspace} onSave={props.onSave} onScanQr={props.onScanQr} /> : <KoneksiDemo {...props} />;
+}
+
+function KoneksiDemo({ workspace, value, onSave }) {
   const [f, setF] = useState({ ...CONN_DEFAULT, ...value });
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);

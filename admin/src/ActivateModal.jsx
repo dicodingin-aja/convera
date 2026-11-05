@@ -1,61 +1,96 @@
-import React, { useState } from 'react';
-import { Field, Modal, Unit, useApp } from './ui.jsx';
+import React, { useEffect, useState } from 'react';
+import { ErrorNote, Field, Loading, Modal, Unit } from './ui.jsx';
 import { Icon } from './Icon.jsx';
-import { NAMES, rp, split } from './calc.js';
-import { activate } from './store.js';
+import { api } from './api.js';
+import { previewSplit, rp } from './calc.js';
+import { useAction, useData } from './hooks.js';
 
-// Form aktivasi/perpanjang. Sales wajib dipilih (penerima komisi).
-export default function ActivateModal({ customer, proof, onClose }) {
-  const { s, update } = useApp();
-  const plans = s.plans;
-  const [planId, setPlanId] = useState(customer.plan && plans.find((p) => p.id === customer.plan) ? customer.plan : plans[0].id);
+// Form aktivasi/perpanjang. Sales wajib dipilih (penerima komisi). Dari bukti transfer -> approve;
+// tanpa bukti -> perpanjang manual. Pembagian yang tampil hanya perkiraan; angka final dihitung server.
+export default function ActivateModal({ customer, proof, onClose, onDone }) {
+  const plansQ = useData('/plans');
+  const salesQ = useData('/sales-people');
+  const rulesQ = useData('/subscription-rules');
+  const { busy, error, run } = useAction();
+  const [planCode, setPlanCode] = useState('');
   const [months, setMonths] = useState(proof ? proof.months : 1);
-  const plan = plans.find((p) => p.id === planId);
-  const suggested = months === 12 && plan.price12 ? plan.price12 : plan.price * months;
-  const [amount, setAmount] = useState(proof ? proof.received : suggested);
-  const [sales, setSales] = useState(customer.sales && NAMES.includes(customer.sales) ? customer.sales : '');
-  const pick = (m, p = plan) => { setMonths(m); setAmount(m === 12 && p.price12 ? p.price12 : p.price * m); };
-  const calc = sales ? split(Number(amount) || 0, sales, s.komisiPct, s.kasPct) : null;
-  const diff = proof ? proof.received - suggested : 0;
+  const [amount, setAmount] = useState('');
+  const [salesId, setSalesId] = useState('');
 
-  const submit = () => {
-    update((x) => activate(x, { customerId: customer.id, proofId: proof?.id, planId, months, amount, sales }));
-    onClose();
+  const plans = plansQ.data?.data || [];
+  const sales = (salesQ.data?.data || []).filter((x) => x.active);
+  const rules = rulesQ.data?.data;
+  const plan = plans.find((p) => p.code === planCode);
+  const suggestedFor = (p, m) => (!p ? 0 : m === 12 && p.price_12m ? p.price_12m : p.price_month * m);
+  const suggested = suggestedFor(plan, months);
+
+  // Nilai awal setelah data siap.
+  useEffect(() => {
+    if (!plans.length || planCode) return;
+    const initial = plans.find((p) => p.code === (proof?.plan || customer.plan)) || plans[0];
+    setPlanCode(initial.code);
+    setAmount(String(proof ? Math.round(proof.received ?? proof.billed) : suggestedFor(initial, months)));
+  }, [plans.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (salesId || !sales.length) return;
+    const known = sales.find((x) => x.name === customer.sales);
+    if (known) setSalesId(known.id);
+  }, [sales.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pick = (m, p = plan) => { setMonths(m); setAmount(String(suggestedFor(p, m))); };
+  const founders = sales.filter((x) => x.is_founder);
+  const chosen = sales.find((x) => x.id === salesId);
+  const calc = chosen && rules ? previewSplit(Number(amount) || 0, rules.komisi_pct, rules.kas_pct, founders.length) : null;
+  const diff = proof ? Math.round((proof.received ?? proof.billed) - suggested) : 0;
+
+  const submit = async () => {
+    const body = { plan: planCode, months, amount: Number(amount), sales_id: salesId };
+    const r = await run(() => (proof ? api.post(`/payment-proofs/${proof.id}/approve`, body) : api.post(`/customers/${customer.id}/extend`, body)));
+    if (r) { onDone?.(); onClose(); }
   };
+
+  const loading = plansQ.loading || salesQ.loading || rulesQ.loading;
+  const loadErr = plansQ.error || salesQ.error || rulesQ.error;
   return (
     <Modal title={proof ? 'Aktifkan akun' : 'Perpanjang manual'} onClose={onClose}>
       <div><b style={{ fontWeight: 600, fontSize: 16 }}>{customer.name}</b><div className="muted">{customer.owner} · {customer.city}</div></div>
-      <div className="grid g2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-        <Field label="Paket">
-          <select className="select" value={planId} onChange={(e) => { setPlanId(e.target.value); pick(months, plans.find((p) => p.id === e.target.value)); }}>
-            {plans.map((p) => <option key={p.id} value={p.id}>{p.name} · {rp(p.price)}/bulan</option>)}
-          </select>
-        </Field>
-        <Field label="Periode">
-          <select className="select" value={months} onChange={(e) => pick(Number(e.target.value))}>
-            {[...new Set([1, 3, 12, months])].sort((a, b) => a - b).map((m) => <option key={m} value={m}>{m} bulan</option>)}
-          </select>
-        </Field>
-        <Field label="Nominal diterima"><Unit value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} unit="Rp" /></Field>
-        <Field label="Sales yang mendaftarkan">
-          <select className="select" value={sales} onChange={(e) => setSales(e.target.value)}>
-            <option value="">Pilih sales…</option>{NAMES.map((n) => <option key={n}>{n}</option>)}
-          </select>
-        </Field>
-      </div>
-      {proof && diff !== 0 ? <div className="warnbox"><Icon name="alert" size={18} />Nominal {diff > 0 ? 'lebih' : 'kurang'} {rp(Math.abs(diff))} dari tagihan {rp(suggested)}.</div> : null}
-      <div className="card" style={{ gap: 8 }}>
-        <span className="caps">Pembagian pembayaran ini</span>
-        {calc ? (
-          <>
-            {NAMES.map((n) => <div key={n} className="row between"><span>{n}{n === sales ? <span className="badge" style={{ marginLeft: 8 }}>sales</span> : null}</span><b style={{ fontWeight: 500 }}>{rp(calc.per[n])}</b></div>)}
-            <div className="row between"><span>Kas bersama</span><b style={{ fontWeight: 500 }}>{rp(calc.kas)}</b></div>
-          </>
-        ) : <span className="muted">Pilih sales untuk melihat pembagian.</span>}
-      </div>
+      {loading || loadErr || !plan ? <Loading error={loadErr || (!loading && !plans.length ? 'Belum ada paket. Buat paket dulu di halaman Paket & Harga.' : '')} /> : (
+        <>
+          <div className="grid g2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            <Field label="Paket">
+              <select className="select" value={planCode} onChange={(e) => { setPlanCode(e.target.value); pick(months, plans.find((p) => p.code === e.target.value)); }}>
+                {plans.map((p) => <option key={p.code} value={p.code}>{p.name} · {rp(p.price_month)}/bulan</option>)}
+              </select>
+            </Field>
+            <Field label="Periode">
+              <select className="select" value={months} onChange={(e) => pick(Number(e.target.value))}>
+                {[1, 3, 12].map((m) => <option key={m} value={m}>{m} bulan</option>)}
+              </select>
+            </Field>
+            <Field label="Nominal diterima"><Unit value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} unit="Rp" /></Field>
+            <Field label="Sales yang mendaftarkan">
+              <select className="select" value={salesId} onChange={(e) => setSalesId(e.target.value)}>
+                <option value="">Pilih sales…</option>{sales.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
+              </select>
+            </Field>
+          </div>
+          {proof && diff !== 0 ? <div className="warnbox"><Icon name="alert" size={18} />Nominal {diff > 0 ? 'lebih' : 'kurang'} {rp(Math.abs(diff))} dari tagihan {rp(suggested)}.</div> : null}
+          <div className="card" style={{ gap: 8 }}>
+            <span className="caps">Perkiraan pembagian pembayaran ini</span>
+            {calc ? (
+              <>
+                {founders.map((n) => <div key={n.id} className="row between"><span>{n.name}{n.id === salesId ? <span className="badge" style={{ marginLeft: 8 }}>sales</span> : null}</span><b style={{ fontWeight: 500 }}>{rp(calc.each + (n.id === salesId ? calc.komisi : 0))}</b></div>)}
+                {chosen && !chosen.is_founder ? <div className="row between"><span>{chosen.name}<span className="badge" style={{ marginLeft: 8 }}>sales</span></span><b style={{ fontWeight: 500 }}>{rp(calc.komisi)}</b></div> : null}
+                <div className="row between"><span>Kas bersama</span><b style={{ fontWeight: 500 }}>{rp(calc.kas)}</b></div>
+              </>
+            ) : <span className="muted">Pilih sales untuk melihat pembagian.</span>}
+          </div>
+          <ErrorNote>{error}</ErrorNote>
+        </>
+      )}
       <div className="row" style={{ justifyContent: 'flex-end' }}>
         <button className="btn soft" onClick={onClose}>Batal</button>
-        <button className="btn primary" disabled={!sales || !Number(amount)} onClick={submit}><Icon name="check" size={18} />Aktifkan</button>
+        <button className="btn primary" disabled={busy || !plan || !salesId || !Number(amount)} onClick={submit}><Icon name="check" size={18} />{busy ? 'Memproses…' : 'Aktifkan'}</button>
       </div>
     </Modal>
   );

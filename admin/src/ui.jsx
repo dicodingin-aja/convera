@@ -11,15 +11,14 @@ export const Field = ({ label, children }) => <label className="f">{label}{child
 export const Unit = ({ value, onChange, unit }) => <div className="unit"><input inputMode="numeric" value={value} onChange={onChange} /><span>{unit}</span></div>;
 
 export function Page({ title, sub, children }) {
-  const { s, go } = useApp();
-  const pending = s.proofs.filter((p) => p.status === 'pending').length;
+  const { pending, go, me } = useApp();
   return (
     <>
       <div className="top">
         <div><h1>{title}</h1>{sub ? <p>{sub}</p> : null}</div>
         <div className="row nowrap">
           <button className="bellbtn" aria-label="Verifikasi pembayaran" onClick={() => go('verifikasi')}><Icon name="bell" size={19} />{pending ? <i>{pending}</i> : null}</button>
-          <span className="av ink round" style={{ width: 40, height: 40 }}>A</span>
+          <span className="av ink round" style={{ width: 40, height: 40 }} title={me?.name || me?.username}>{(me?.name || me?.username || 'A').slice(0, 1).toUpperCase()}</span>
         </div>
       </div>
       <div className="body">{children}</div>
@@ -50,11 +49,13 @@ const AV = ['solid', 'soft', '', 'ink'];
 export const initials = (n) => n.split(' ').map((x) => x[0]).join('').slice(0, 2).toUpperCase();
 export const Av = ({ name, i = 0, round }) => <span className={'av ' + AV[i % AV.length] + (round ? ' round' : '')}>{initials(name)}</span>;
 
-export const statusInfo = (c) => ({ active: ['Berlangganan', 'ink'], trial: ['Trial', 'soft'], expired: ['Berakhir', 'accent'], pending: ['Menunggu', 'soft'] }[c.status]);
+export const statusInfo = (c) => ({ active: ['Berlangganan', 'ink'], trial: ['Trial', 'soft'], expired: ['Berakhir', 'accent'], stopped: ['Dihentikan', 'accent'], pending: ['Menunggu', 'soft'], none: ['—', ''] }[c.status] || [c.status || '—', '']);
 export const Pill = ({ tone = '', children }) => <span className={'pill ' + tone}>{children}</span>;
 
-export function downloadCsv(name, rows) {
-  const esc = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const blob = new Blob([rows.map((r) => r.map(esc).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href);
-}
+// Status memuat/galat yang seragam untuk halaman.
+export const Loading = ({ error, children }) => (error
+  ? <div className="card" role="alert" style={{ color: 'var(--danger)' }}>{error}</div>
+  : <div className="card muted">{children || 'Memuat…'}</div>);
+
+// Pesan galat di dalam form/modal.
+export const ErrorNote = ({ children }) => (children ? <div role="alert" style={{ color: 'var(--danger)', fontSize: 13 }}>{children}</div> : null);

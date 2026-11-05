@@ -1,3 +1,5 @@
+> ⚠️ **Dokumen ini usang.** Baca [../CHECKPOINT.md](../CHECKPOINT.md) untuk status terbaru.
+
 # Catatan Serah Terima Backend
 
 Status per 5 November 2026. Baca ini dulu sebelum melanjutkan backend atau integrasi Meta/WhatsApp.

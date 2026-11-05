@@ -1,7 +1,8 @@
 import React from 'react';
-import { Page, Pill, Toggle, useApp } from '../ui.jsx';
+import { ErrorNote, Loading, Page, Pill, Toggle } from '../ui.jsx';
 import { Icon } from '../Icon.jsx';
-import { addLog } from '../store.js';
+import { api } from '../api.js';
+import { useAction, useData } from '../hooks.js';
 
 const ITEMS = [
   ['meta', 'Meta Conversions API', 'Pengiriman event konversi ke Meta.', 'trend'],
@@ -13,18 +14,25 @@ const ITEMS = [
 ];
 
 export default function Integrasi() {
-  const { s, update } = useApp();
+  const q = useData('/integrations');
+  const { error, run } = useAction();
+  const on = q.data?.data || {};
+  const set = (k, v) => run(async () => { await api.put('/integrations', { [k]: v }); q.reload(); });
   return (
     <Page title="Integrasi" sub="Layanan yang tersambung ke Convera">
-      <div className="grid g3">
-        {ITEMS.map(([k, title, desc, icon]) => (
-          <div className="card" key={k} style={{ gap: 14 }}>
-            <div className="row between nowrap"><span className="av" style={{ width: 44, height: 44 }}><Icon name={icon} size={22} /></span><Toggle on={s.integrations[k]} label={title} onChange={(v) => update((x) => addLog({ ...x, integrations: { ...x.integrations, [k]: v } }, `${v ? 'Mengaktifkan' : 'Mematikan'} integrasi ${title}`))} /></div>
-            <div><b style={{ fontWeight: 600, fontSize: 16 }}>{title}</b><div className="muted">{desc}</div></div>
-            <div><Pill tone={s.integrations[k] ? 'ink' : ''}>{s.integrations[k] ? 'Terhubung' : 'Nonaktif'}</Pill></div>
-          </div>
-        ))}
-      </div>
+      <ErrorNote>{error}</ErrorNote>
+      {q.error || (q.loading && !q.data) ? <Loading error={q.error} /> : (
+        <div className="grid g3">
+          {ITEMS.map(([k, title, desc, icon]) => (
+            <div className="card" key={k} style={{ gap: 14 }}>
+              <div className="row between nowrap"><span className="av" style={{ width: 44, height: 44 }}><Icon name={icon} size={22} /></span><Toggle on={!!on[k]} label={title} onChange={(v) => set(k, v)} /></div>
+              <div><b style={{ fontWeight: 600, fontSize: 16 }}>{title}</b><div className="muted">{desc}</div></div>
+              <div><Pill tone={on[k] ? 'ink' : ''}>{on[k] ? 'Aktif' : 'Nonaktif'}</Pill></div>
+            </div>
+          ))}
+        </div>
+      )}
+      <span className="muted sm">Sakelar ini mencatat pengaturan; penyambungan tiap layanan dikerjakan terpisah.</span>
     </Page>
   );
 }

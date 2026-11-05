@@ -1,15 +1,15 @@
-// Login admin tunggal. Mode demo: belum ada server, jadi kredensial TIDAK diverifikasi sungguhan.
-// Saat backend siap, ganti isi login()/logout() dengan POST/DELETE ke endpoint sesi admin.
-const KEY = 'convera-admin:session';
+// Sesi admin lewat API. Cookie httpOnly tidak terbaca JavaScript, jadi status login ditanyakan ke server.
+import { api } from './api.js';
 
-export const getSession = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } };
-
-export async function login(username, password) {
-  if (String(username).trim().toLowerCase() !== 'admin') throw new Error('Username atau password salah');
-  if (String(password).length < 6) throw new Error('Username atau password salah');
-  const session = { user: 'admin', at: new Date().toISOString() };
-  try { localStorage.setItem(KEY, JSON.stringify(session)); } catch { /* abaikan */ }
-  return session;
+export async function getSession() {
+  try { return (await api.get('/auth/session')).data.admin; } catch (e) { if (e.status === 401) return null; throw e; }
 }
 
-export const logout = () => { try { localStorage.removeItem(KEY); } catch { /* abaikan */ } };
+export async function login(username, password) {
+  if (!String(username).trim() || !password) throw new Error('Username dan password wajib diisi');
+  return (await api.post('/auth/login', { username: String(username).trim(), password })).data.admin;
+}
+
+export async function logout() {
+  try { await api.post('/auth/logout'); } catch { /* sesi sudah berakhir */ }
+}
