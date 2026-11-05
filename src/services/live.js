@@ -288,6 +288,12 @@ export function liveOverview(live, h) {
 
 // ---------- Tindakan ke server ----------
 
+// Lonceng notifikasi (level akun, bukan per workspace).
+export const notifApi = {
+  list: () => requestJson('/api/v1/notifications').then((r) => ({ items: r.data || [], unread: (r.meta && r.meta.unread) || 0 })),
+  readAll: () => requestJson('/api/v1/notifications/read-all', { method: 'POST' }),
+};
+
 export const liveApi = {
   leadDetail: (slug, id) => requestJson('/api/v1/leads/' + id, { workspace: slug }).then((r) => r.data),
   eventDetail: (slug, id) => requestJson('/api/v1/events/' + id, { workspace: slug }).then((r) => r.data),

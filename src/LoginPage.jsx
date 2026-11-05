@@ -16,6 +16,7 @@ export default function LoginPage({ themeStyle, onLogin }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showPw, setShowPw] = useState(false);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -61,14 +62,24 @@ export default function LoginPage({ themeStyle, onLogin }) {
         ) : null}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 700 }}>
           Password
-          <input type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} style={field} />
+          <div style={{ position: 'relative' }}>
+            <input type={showPw ? 'text' : 'password'} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} style={{ ...field, paddingRight: 44 }} />
+            <button type="button" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? 'Sembunyikan password' : 'Tampilkan password'} aria-pressed={showPw} title={showPw ? 'Sembunyikan password' : 'Tampilkan password'}
+              style={{ position: 'absolute', top: 0, right: 0, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 0, background: 'none', color: 'var(--muted)', cursor: 'pointer' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+                <circle cx="12" cy="12" r="3" />
+                {showPw ? <path d="M3 3l18 18" /> : null}
+              </svg>
+            </button>
+          </div>
         </label>
         {info ? <div role="status" style={{ color: 'var(--accent)', fontSize: 13, fontWeight: 600 }}>{info}</div> : null}
         {error ? <div role="alert" style={{ color: 'var(--danger)', fontSize: 13, fontWeight: 600 }}>{error}</div> : null}
         <button type="submit" disabled={busy} style={{ height: 44, border: 0, borderRadius: 10, background: 'var(--accent)', color: '#fff', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.7 : 1 }}>{busy ? 'Memproses…' : mode === 'register' ? 'Daftar' : 'Masuk'}</button>
         {appConfig.backendEnabled ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-            <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setInfo(''); }} style={{ border: 0, background: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{mode === 'login' ? 'Belum punya akun? Daftar' : 'Kembali ke halaman masuk'}</button>
+            <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }} style={{ border: 0, background: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{mode === 'login' ? 'Belum punya akun? Daftar' : 'Kembali ke halaman masuk'}</button>
             {mode === 'login' ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>Lupa password? Hubungi tim Convera.</span> : null}
           </div>
         ) : null}

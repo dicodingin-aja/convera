@@ -9,7 +9,7 @@ import PlansModal from './PlansModal.jsx';
 import { updateProfile, ensureWorkspace, getSubscription, listWorkspaces } from './services/backend.js';
 import AddWorkspaceCard from './CreateWorkspace.jsx';
 import QrScanPage from './QrScanPage.jsx';
-import { fetchLive, emptyLive, liveApi, rangeFor } from './services/live.js';
+import { fetchLive, emptyLive, liveApi, notifApi, rangeFor } from './services/live.js';
 import { appConfig } from './services/config.js';
 import PaymentModal from './PaymentModal.jsx';
 import LoginPage from './LoginPage.jsx';
@@ -135,6 +135,15 @@ export default class App extends React.Component {
       this.setState({ live: next });
     } catch { /* pertahankan data sebelumnya; 401 ditangani oleh handleUnauthorized */ }
   };
+  refreshNotifs = async () => {
+    if (!appConfig.backendEnabled || !this.state.session) return;
+    try { this.setState({ notifs: await notifApi.list() }); } catch { /* biarkan daftar sebelumnya */ }
+  };
+  readAllNotifs = async () => {
+    const cur = this.state.notifs;
+    if (cur) this.setState({ notifs: { items: cur.items.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })), unread: 0 } });
+    try { await notifApi.readAll(); } catch { this.refreshNotifs(); }
+  };
   // Detail lead/event diambil saat panelnya dibuka (timeline lead, payload & respons Meta).
   fetchOpenDetails = () => {
     const slug = this._activeWsSlug, live = this.state.live, st = this.logic.state;
@@ -180,7 +189,7 @@ export default class App extends React.Component {
     this.logic.componentDidMount();
     window.addEventListener('convera:unauthorized', this.handleUnauthorized);
     this.loadWorkspaces();
-    this._liveTimer = setInterval(() => { if (document.visibilityState === 'visible') this.refreshLive(); }, 30000);
+    this._liveTimer = setInterval(() => { if (document.visibilityState === 'visible') { this.refreshLive(); this.refreshNotifs(); } }, 30000);
   }
   componentDidUpdate() {
     if (appConfig.backendEnabled && this.state.session && this.state.workspaces && this._activeWsSlug) {
@@ -188,6 +197,7 @@ export default class App extends React.Component {
       if (this._liveKey !== key) { this._liveKey = key; this.refreshLive(); }
       this.fetchOpenDetails();
     }
+    if (appConfig.backendEnabled && this.state.session && this._notifSession !== this.state.session) { this._notifSession = this.state.session; this.refreshNotifs(); }
     const ws = this._activeWsName;
     if (appConfig.backendEnabled && this.state.session && ws && (this._subWs !== ws || this._subSession !== this.state.session)) {
       this._subWs = ws; this._subSession = this.state.session;
@@ -197,7 +207,7 @@ export default class App extends React.Component {
   componentWillUnmount() { this.logic.componentWillUnmount(); window.removeEventListener('convera:unauthorized', this.handleUnauthorized); clearInterval(this._liveTimer); }
   render() {
     this.logic.props = appConfig.backendEnabled && this.state.workspaces
-      ? { ...this.props_, workspaces: this.state.workspaces, live: this.state.live || emptyLive(this.logic.state.range ?? 2) }
+      ? { ...this.props_, workspaces: this.state.workspaces, live: this.state.live || emptyLive(this.logic.state.range ?? 2), notifs: this.state.notifs || { items: [], unread: 0 }, readAllNotifs: this.readAllNotifs }
       : this.props_;
     const vals = { ...this.props_, ...(this.logic.renderVals() || {}) };
     if (!this.state.session) return <LoginPage themeStyle={vals.rootStyle} onLogin={this.handleLogin} />;

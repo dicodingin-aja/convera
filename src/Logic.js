@@ -634,10 +634,20 @@ class Component extends DCLogic {
     const menu = (m) => () => this.setState({ menu: s.menu === m ? null : m });
     const PRE = P.live ? [0, 1, 2, 3, 4, 5].map((i) => { const r = rangeFor(i); return [r.label, r.hint]; }) : [['Hari ini', '17 Okt'], ['Kemarin', '16 Okt'], ['7 hari terakhir', '11–17 Okt'], ['30 hari terakhir', '18 Sep–17 Okt'], ['Bulan ini', '1–17 Okt'], ['Bulan lalu', 'Sep 2026']];
     const presets = PRE.map(([label, hint], i) => ({ label, hint, pick: () => this.setState({ range: i, menu: null }), style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: i === s.range ? 500 : 400, background: i === s.range ? 'var(--accentSoft)' : 'transparent', color: i === s.range ? 'var(--accentText)' : 'var(--text)' } }));
-    const NOT = [['err', 'alert', 'WhatsApp +62 812-•••-7890 terputus. Event dari nomor ini ditahan.', '2 jam lalu'], ['warn', 'clock', 'Token Meta kedaluwarsa dalam 5 hari.', '5 jam lalu'], ['ok', 'bag', '48 Purchase terkirim kemarin · Rp 21.300.000', 'Kemarin, 08.00'], ['info', 'users', 'Dina (CS) bergabung ke workspace Kopi Senja.', '2 hari lalu']];
+    // Mode backend: notifikasi nyata dari API; mode demo tetap memakai data contoh.
+    const agoId = (iso) => { const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 1 ? 'Baru saja' : m < 60 ? m + ' mnt lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
+    const realNotifs = P.live ? ((P.notifs && P.notifs.items) || []) : null;
+    const NOT = realNotifs
+      ? realNotifs.map((n) => {
+        const ty = String(n.type || '');
+        const tn = /reject|invalid|fail|disconnect|expired/.test(ty) ? 'err' : /remind|expir|token|trial|soon/.test(ty) ? 'warn' : /approv|activ|paid|success|verified/.test(ty) ? 'ok' : 'info';
+        return [tn, tn === 'err' ? 'alert' : tn === 'warn' ? 'clock' : tn === 'ok' ? 'bag' : 'users', n.body ? n.title + ' · ' + n.body : n.title, agoId(n.created_at), !n.read_at];
+      })
+      : [['err', 'alert', 'WhatsApp +62 812-•••-7890 terputus. Event dari nomor ini ditahan.', '2 jam lalu'], ['warn', 'clock', 'Token Meta kedaluwarsa dalam 5 hari.', '5 jam lalu'], ['ok', 'bag', '48 Purchase terkirim kemarin · Rp 21.300.000', 'Kemarin, 08.00'], ['info', 'users', 'Dina (CS) bergabung ke workspace Kopi Senja.', '2 hari lalu']];
+    const isUnread = (k, flag) => (realNotifs ? !!flag : !s.read && k < 3);
     const tone = { err: ['var(--errBg)', 'var(--errFg)'], warn: ['var(--warnBg)', 'var(--warnFg)'], ok: ['var(--okBg)', 'var(--okFg)'], info: ['var(--neutral)', 'var(--text)'] };
-    const notifs = NOT.map(([t, i, title, time], k) => ({ title, time, icon: ic[i], unread: !s.read && k < 3,
-      row: { display: 'flex', gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--border)', background: !s.read && k < 3 ? 'var(--surface2)' : 'transparent' },
+    const notifs = NOT.map(([t, i, title, time, unreadFlag], k) => ({ title, time, icon: ic[i], unread: isUnread(k, unreadFlag),
+      row: { display: 'flex', gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--border)', background: isUnread(k, unreadFlag) ? 'var(--surface2)' : 'transparent' },
       iconStyle: { width: 30, height: 30, flex: 'none', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tone[t][0], color: tone[t][1] } }));
     const BAN = [
       ['wa', 'err', 'WhatsApp +62 812-•••-7890 terputus.', 'Event dari nomor ini ditahan sampai terhubung lagi.', 'Hubungkan ulang', 'koneksi'],
@@ -667,7 +677,7 @@ class Component extends DCLogic {
       nav, menuOpen: false, closeMenus: () => this.setState({ menu: null }),
       openDate: menu('date'), dateMenu: s.menu === 'date', dateLabel: PRE[s.range][0] + (W >= 1280 ? ' · ' + PRE[s.range][1] : ''), presets,
       openHealth: menu('health'), healthMenu: s.menu === 'health', goKoneksi: () => this.setState({ page: 'koneksi', menu: null }),
-      openNotif: menu('notif'), notifMenu: s.menu === 'notif', notifs, unread: s.read ? 0 : 3, readAll: () => this.setState({ read: true }),
+      openNotif: menu('notif'), notifMenu: s.menu === 'notif', notifs, unread: realNotifs ? (P.notifs.unread || 0) : (s.read ? 0 : 3), readAll: () => (realNotifs ? P.readAllNotifs && P.readAllNotifs() : this.setState({ read: true })),
       notifPanelStyle: { position: mobile ? 'fixed' : 'absolute', top: mobile ? 70 : 'calc(100% + 6px)', right: mobile ? 12 : 0, left: mobile ? 12 : 'auto', width: mobile ? 'auto' : 360, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 20px 44px -18px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
       openHelp: menu('help'), helpMenu: s.menu === 'help', openUser: menu('user'), userMenu: s.menu === 'user',
       goOnboarding: () => this.setState({ screen: 'onboarding', menu: null }),
