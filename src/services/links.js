@@ -1,4 +1,4 @@
-// Tautan dari email membawa token di query string (?reset=... / ?verify=...). Token diambil sekali lalu dihapus
+// Tautan khusus (mis. ?support=...) membawa token di query string. Token diambil sekali lalu dihapus
 // dari URL agar tidak tertinggal di riwayat browser, bookmark, atau header Referer.
 export function takeParam(name) {
   try {

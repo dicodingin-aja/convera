@@ -14,7 +14,7 @@ class Component extends DCLogic {
     test: 'idle', wa: 'cloud', methods: { api: true, manual: true, auto: false }, send: 'idle', pop: false, guide: false,
     page: 'overview', collapsed: null, menu: null, wsQuery: '', ws: 0, range: 2, read: false, more: false,
     banners: { wa: true, token: true, quota: true, trial: true },
-    profile: { name: 'Raka Santoso', email: 'raka@convera.id', phone: '+62 812-0000-0000' },
+    profile: { name: 'Raka Santoso', username: 'raka', phone: '+62 812-0000-0000' },
   };
   componentDidMount() { this.onR = () => this.setState({ width: window.innerWidth }); this.onR(); window.addEventListener('resize', this.onR); }
   componentWillUnmount() { window.removeEventListener('resize', this.onR); clearTimeout(this.t1); clearTimeout(this.t2); clearTimeout(this.tt); clearInterval(this.iv); }
@@ -626,7 +626,7 @@ class Component extends DCLogic {
     const WS = [['Kopi Senja', 'F&B · Jakarta'], ['Klinik Gigi Senyum', 'Klinik · Bandung'], ['Rumah Pijat Sehati', 'Jasa · Surabaya'], ['Laundry Kilat Bersih', 'Jasa · Depok'], ['Bimbel Cerdas Mandiri', 'Pendidikan · Medan'], ['Toko Hijab Amira', 'Fashion · Yogyakarta']];
     // Mode backend: daftar workspace nyata dari server (App meneruskannya lewat props.workspaces); selain itu daftar contoh.
     const WSP = Array.isArray(this.props.workspaces) ? this.props.workspaces : null;
-    if (WSP) { WS.length = 0; WSP.forEach((w) => WS.push([w.name, w.meta, w.slug])); if (!WS.length) WS.push(['—', '', '']); } else WS[0][0] = s.f.biz || 'Kopi Senja';
+    if (WSP) { WS.length = 0; WSP.forEach((w) => WS.push([w.name, w.meta, w.slug])); if (!WS.length) WS.push(['Belum ada workspace', 'Tambahkan workspace', '']); } else WS[0][0] = s.f.biz || 'Kopi Senja';
     const q = s.wsQuery.trim().toLowerCase();
     const wsList = WS.map(([name, meta], i) => ({ name, meta, i })).filter((w) => !q || w.name.toLowerCase().includes(q)).map((w) => ({ name: w.name, meta: w.meta, active: w.i === s.ws, ini: w.name.split(' ').map((x) => x[0]).join('').slice(0, 2).toUpperCase(),
       pick: () => this.setState({ ws: w.i, menu: null, more: false, wsQuery: '' }),

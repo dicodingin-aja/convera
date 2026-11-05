@@ -85,3 +85,39 @@ export function SupportAccessModal({ customer, onClose }) {
     </Modal>
   );
 }
+
+// Reset password customer (tidak ada reset lewat email). Password sementara hanya tampil sekali; semua sesi customer dicabut.
+export function ResetPasswordModal({ customer, onClose }) {
+  const [res, setRes] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const { busy, error, run } = useAction();
+  const create = async () => { const r = await run(() => api.post(`/customers/${customer.id}/reset-password`, {})); if (r) setRes(r.data); };
+  const copy = async () => { try { await navigator.clipboard.writeText(res.temporary_password); setCopied(true); } catch { /* salin manual */ } };
+  return (
+    <Modal title={`Reset password ${customer.name}`} onClose={onClose}>
+      {res ? (
+        <div className="card" style={{ gap: 10 }}>
+          <b style={{ fontWeight: 600 }}>Password sementara</b>
+          <span className="muted">Username: <b>{res.username}</b>. Password ini hanya tampil sekali, kirim ke customer lewat kanal yang aman dan minta mereka menggantinya di Profil.</span>
+          <code style={{ fontSize: 18, padding: '10px 12px', borderRadius: 8, background: 'var(--surface2, #f3f3f3)', userSelect: 'all' }}>{res.temporary_password}</code>
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            <button className="btn" onClick={copy}>{copied ? 'Tersalin' : 'Salin'}</button>
+            <button className="btn primary" onClick={onClose}>Selesai</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="warnbox" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+            <b style={{ fontWeight: 600 }}>Password lama {customer.owner || 'customer'} akan diganti</b>
+            <span>Semua sesi login customer langsung keluar. Tindakan ini dicatat di audit log.</span>
+          </div>
+          <ErrorNote>{error}</ErrorNote>
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            <button className="btn soft" onClick={onClose}>Batal</button>
+            <button className="btn primary" disabled={busy} onClick={create}>{busy ? 'Memproses…' : 'Buat password sementara'}</button>
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}

@@ -12,7 +12,6 @@ import (
 	"github.com/dicodingin-aja/convera/backend/internal/ads"
 	"github.com/dicodingin-aja/convera/backend/internal/config"
 	"github.com/dicodingin-aja/convera/backend/internal/core"
-	"github.com/dicodingin-aja/convera/backend/internal/mail"
 	"github.com/dicodingin-aja/convera/backend/internal/meta"
 	"github.com/dicodingin-aja/convera/backend/internal/secure"
 	"github.com/dicodingin-aja/convera/backend/internal/upload"
@@ -27,7 +26,6 @@ type Server struct {
 	Box    *secure.Box
 	Meta   *meta.Client
 	Files  *upload.Store
-	Mail   mail.Sender
 	Syncer *ads.Syncer
 
 	limMu    sync.Mutex
@@ -39,7 +37,6 @@ func New(cfg *config.Config, db *pgxpool.Pool, box *secure.Box) *Server {
 		Cfg: cfg, DB: db, Box: box,
 		Meta:     &meta.Client{BaseURL: cfg.GraphBaseURL, Version: cfg.GraphAPIVersion},
 		Files:    &upload.Store{Dir: cfg.UploadDir},
-		Mail:     mail.New(mail.Config{Host: cfg.SMTPHost, Port: cfg.SMTPPort, User: cfg.SMTPUser, Pass: cfg.SMTPPass, From: cfg.MailFrom}),
 		Syncer:   &ads.Syncer{DB: db, Box: box, Client: &ads.Client{BaseURL: cfg.GraphBaseURL, Version: cfg.GraphAPIVersion}},
 		limiters: map[string]*rate.Limiter{},
 	}
@@ -83,9 +80,6 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/public/status", s.publicStatus)
 	api.GET("/status", s.publicStatus)
 	api.POST("/auth/support-login", s.rateLimitIP(10), s.supportLogin)
-	api.POST("/auth/forgot-password", s.rateLimitIP(5), s.forgotPassword)
-	api.POST("/auth/reset-password", s.rateLimitIP(10), s.resetPassword)
-	api.POST("/auth/verify-email", s.rateLimitIP(10), s.verifyEmail)
 	api.POST("/auth/register", s.rateLimitIP(5), s.register)
 	api.POST("/auth/login", s.rateLimitIP(10), s.login)
 
@@ -94,7 +88,6 @@ func (s *Server) Router() *gin.Engine {
 	authed.GET("/auth/session", s.session)
 	authed.POST("/auth/refresh", s.refresh)
 	authed.GET("/auth/csrf", s.csrfToken)
-	authed.POST("/auth/resend-verification", s.resendVerification)
 	authed.GET("/me/profile", s.getProfile)
 	authed.PATCH("/me/profile", s.patchProfile)
 	authed.POST("/me/password", s.changePassword)
@@ -116,6 +109,7 @@ func (s *Server) Router() *gin.Engine {
 	ws.POST("/payment-proofs", s.uploadProof)
 	ws.GET("/overview", s.overview)
 	ws.GET("/performance", s.performance)
+	ws.GET("/reports/daily", s.dailyReport)
 	ws.GET("/leads", s.listLeads)
 	ws.GET("/leads/:id", s.getLead)
 	ws.POST("/leads/:id/conversions", s.manualConversion)

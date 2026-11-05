@@ -46,11 +46,6 @@ services:
       GIN_MODE: release
       UPLOAD_DIR: /data/uploads
       APP_URL: https://${APP_DOMAIN}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      MAIL_FROM: ${MAIL_FROM:-Convera <no-reply@localhost>}
       QR_SERVICE_URL: http://waqr:8090
       QR_SERVICE_TOKEN: ${QR_SERVICE_TOKEN:?isi QR_SERVICE_TOKEN di deploy/.env (min. 16 karakter acak)}
     depends_on:

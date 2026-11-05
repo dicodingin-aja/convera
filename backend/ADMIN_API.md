@@ -54,10 +54,13 @@ API customer mendapat dua endpoint baca yang diisi dari sini: `GET /api/v1/plans
 - **Tolak bukti.** Bila langganan berstatus `pending` hanya karena bukti itu, statusnya kembali ke aktif / trial / berakhir.
 - CSV mencegah injeksi rumus (sel berawalan `= + - @` diberi apostrof) dan memakai BOM agar terbaca di Excel.
 
+## Reset password customer
+
+- `POST /customers/{id}/reset-password` (superadmin): membuat password sementara untuk pemilik workspace, tampil sekali di respons `{username, temporary_password}`, semua sesi customer dicabut, dicatat di audit log `customer.password_reset`.
+
 ## Belum ada
 
-
-- Pengingat kedaluwarsa H-7/H-3/H-1, pengiriman email/WhatsApp ke admin, dan autentikasi API admin lewat API key belum ada.
+- Pengingat kedaluwarsa H-7/H-3/H-1, pengiriman WhatsApp ke admin, dan autentikasi API admin lewat API key belum ada.
 - Peran hanya `superadmin` dan `admin`; belum ada daftar admin yang bisa dikelola dari web.
 
 ## Masuk ke dashboard customer (akses dukungan)

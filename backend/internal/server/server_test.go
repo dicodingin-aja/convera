@@ -76,3 +76,27 @@ func TestHashKeyStable(t *testing.T) {
 		t.Error("hashKey")
 	}
 }
+
+func TestUsernameRule(t *testing.T) {
+	good := []string{"abc", "toko.kopi", "a_b-c", "0abc", "a23456789012345678901234567890"}
+	bad := []string{"", "ab", "Abc", "_abc", ".abc", "a b", "a@b.com", "a234567890123456789012345678901"}
+	for _, u := range good {
+		if !usernameRe.MatchString(u) {
+			t.Errorf("%q seharusnya valid", u)
+		}
+	}
+	for _, u := range bad {
+		if usernameRe.MatchString(u) {
+			t.Errorf("%q seharusnya ditolak", u)
+		}
+	}
+}
+
+func TestEmailFlowsRemoved(t *testing.T) {
+	r := testRouter()
+	for _, p := range []string{"/api/v1/auth/forgot-password", "/api/v1/auth/reset-password", "/api/v1/auth/verify-email", "/api/v1/auth/resend-verification"} {
+		if w := do(r, "POST", p, `{}`, nil); w.Code != 404 {
+			t.Errorf("POST %s = %d; want 404", p, w.Code)
+		}
+	}
+}

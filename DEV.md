@@ -30,8 +30,8 @@ ENCRYPTION_KEY=<hasil go run ./cmd/genkey>
 GRAPH_API_VERSION=<versi Graph API yang masih didukung, mis. v23.0>
 ```
 
-Tanpa `SMTP_HOST`, email (verifikasi, reset password, pengingat) **tidak dikirim**; isinya dicetak di terminal
-tempat API/worker berjalan, termasuk tautannya. Cukup salin tautan itu ke browser.
+Tidak ada pengiriman email: login customer memakai username + password (email, telepon, dan nama wajib diisi saat daftar sebagai data kontak). Bila customer lupa password, superadmin membuat
+password sementara di Convera Admin (Customer > Reset password).
 
 ## 2. Setiap kali development (5 terminal)
 
@@ -51,10 +51,9 @@ hapus/ubah jadi `false` untuk kembali ke mode demo tanpa backend.
 
 ## 3. Yang bisa dicoba
 
-1. **Customer** (http://localhost:5173): Daftar → (email verifikasi tercetak di terminal API) → buka menu Koneksi
+1. **Customer** (http://localhost:5173): Daftar (username + password) → buka menu Koneksi
    (workspace dibuat otomatis dari daftar di UI) → Simpan / Tes Koneksi.
    Menu Upgrade → pilih paket → unggah bukti transfer (rekening tujuan dibuat admin dulu, lihat langkah 2).
-   "Lupa password?" di halaman masuk → tautan reset tercetak di terminal API.
 2. **Admin** (http://localhost:5174): masuk dengan akun `adminctl`.
    Paket & Harga → tambah **rekening bank** (agar customer punya tujuan transfer) →
    Verifikasi → bukti dari customer muncul → Lihat bukti → Aktifkan akun. Cek Customer, Bagi Hasil, Ringkasan.

@@ -19,11 +19,10 @@ Definisi lengkap ada di folder [migrations/](migrations/).
 
 | Tabel | Isi |
 |---|---|
-| `users` | Akun customer. Email unik (tidak peka huruf besar/kecil) di antara akun yang belum dihapus. |
+| `users` | Akun customer. `username` unik (tidak peka huruf besar/kecil) di antara akun yang belum dihapus; login memakai username; `email` tetap disimpan sebagai kontak (unik, tanpa verifikasi; migrasi 00013). |
 | `admins` | Akun Convera Admin. Role `superadmin` / `admin`. |
 | `sessions` | Sesi login (hash refresh token). Milik tepat satu: user **atau** admin. |
 | `password_resets` | Token reset password sekali pakai (hash). |
-| `email_verifications` | *Tambahan.* Token verifikasi email (hash). |
 
 ### 4.2 Bisnis, langganan, dan pembayaran — `00003_business.sql`
 
@@ -88,7 +87,6 @@ Definisi lengkap ada di folder [migrations/](migrations/).
 
 | Perubahan | Alasan |
 |---|---|
-| Tabel `email_verifications` | `users.email_verified_at` butuh tempat menyimpan token verifikasi. |
 | `payment_proofs`: `kind`, `plan_id`, `months`, `uploaded_by`, `file_mime`, `file_size` | Paket pilihan customer dan validasi file (jpg/png/pdf) dicatat sebelum admin memutuskan. |
 | `payments`: `plan_id`, `payment_proof_id`, `period_start`, `period_end` | Riwayat periode yang dibayar dan tautan ke bukti transfernya. |
 | `subscriptions.status` tambah `stopped` | Untuk aksi admin "Stop" (POST customers/{id}/stop). |

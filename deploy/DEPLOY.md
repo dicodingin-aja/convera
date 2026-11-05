@@ -150,7 +150,7 @@ Sebelum update yang menyertakan migrasi, jalankan `./backup.sh` dulu.
 - **UI Convera Admin sudah tersambung ke API admin** (data sungguhan, bukan data contoh). Karena berisi data keuangan,
   batasi dengan `ADMIN_ALLOW_IPS` bila tim punya IP tetap/VPN.
 - Bukti transfer disimpan di volume Docker `convera_uploads` (bukan di database). `backup.sh` ikut mengarsipkannya; jangan jalankan `docker compose down -v`.
-- Belum ada verifikasi email dan reset password.
+- Tidak ada email: akun memakai username + password. Lupa password diselesaikan superadmin lewat Convera Admin (Customer > Reset password).
 - Pengiriman ke Meta baru diuji ke server tiruan; uji end-to-end dengan Test Events Meta sebelum dipakai klien.
 - Mode QR (Baileys) belum ada. Satu VPS tanpa redundansi: cadangan di luar VPS wajib.
 - File Docker di folder ini sudah divalidasi sintaksnya tetapi **belum dibuild di mesin lain**; build pertama di VPS bisa menampakkan penyesuaian kecil.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/dicodingin-aja/convera/backend/internal/core"
 	"github.com/dicodingin-aja/convera/backend/internal/secure"
+	"github.com/dicodingin-aja/convera/backend/internal/wa"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -24,9 +25,10 @@ const (
 )
 
 var (
-	emailRe = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
-	slugRe  = regexp.MustCompile(`[^a-z0-9]+`)
-	// Hash palsu agar login untuk email yang tidak ada memakan waktu yang sama dengan yang ada.
+	usernameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{2,29}$`)
+	emailRe    = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
+	slugRe     = regexp.MustCompile(`[^a-z0-9]+`)
+	// Hash palsu agar login untuk username yang tidak ada memakan waktu yang sama dengan yang ada.
 	dummyHash, _ = bcrypt.GenerateFromPassword([]byte("convera-dummy"), bcrypt.DefaultCost)
 )
 
@@ -40,8 +42,10 @@ func isUnique(err error) bool {
 // ---------- Register / login / logout ----------
 
 type credentials struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
+	Username string `json:"username"`
+	Name     string `json:"name"`  // wajib saat daftar
+	Email    string `json:"email"` // wajib saat daftar (kontak; bukan untuk login, tanpa verifikasi)
+	Phone    string `json:"phone"` // wajib saat daftar
 	Password string `json:"password"`
 }
 
@@ -51,17 +55,25 @@ func (s *Server) register(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "bad_request", "Body tidak valid.")
 		return
 	}
-	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
+	in.Username = strings.ToLower(strings.TrimSpace(in.Username))
 	in.Name = strings.TrimSpace(in.Name)
+	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
+	phone, phoneErr := wa.NormalizePhone(in.Phone)
 	switch {
-	case !emailRe.MatchString(in.Email):
-		fail(c, http.StatusUnprocessableEntity, "validation_error", "Format email tidak valid.")
+	case !usernameRe.MatchString(in.Username):
+		fail(c, http.StatusUnprocessableEntity, "validation_error", "Username 3 sampai 30 karakter: huruf kecil, angka, titik, garis bawah, atau strip; harus diawali huruf atau angka.")
 		return
-	case len(in.Password) < 8 || len(in.Password) > 72:
+	case !validPassword(in.Password):
 		fail(c, http.StatusUnprocessableEntity, "validation_error", "Password 8 sampai 72 karakter.")
 		return
 	case in.Name == "" || len(in.Name) > 120:
 		fail(c, http.StatusUnprocessableEntity, "validation_error", "Nama wajib diisi (maks. 120 karakter).")
+		return
+	case !emailRe.MatchString(in.Email) || len(in.Email) > 254:
+		fail(c, http.StatusUnprocessableEntity, "validation_error", "Format email tidak valid.")
+		return
+	case phoneErr != nil:
+		fail(c, http.StatusUnprocessableEntity, "validation_error", "Nomor telepon tidak valid.")
 		return
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
@@ -70,19 +82,21 @@ func (s *Server) register(c *gin.Context) {
 		return
 	}
 	var id string
-	err = s.DB.QueryRow(c, `INSERT INTO users (email, password_hash, name) VALUES ($1,$2,$3) RETURNING id::text`,
-		in.Email, string(hash), in.Name).Scan(&id)
+	err = s.DB.QueryRow(c, `INSERT INTO users (username, email, password_hash, name, phone) VALUES ($1,$2,$3,$4,$5) RETURNING id::text`,
+		in.Username, in.Email, string(hash), in.Name, phone).Scan(&id)
 	if isUnique(err) {
-		fail(c, http.StatusConflict, "email_taken", "Email sudah terdaftar.")
+		var pe *pgconn.PgError
+		if errors.As(err, &pe) && strings.Contains(pe.ConstraintName, "email") {
+			fail(c, http.StatusConflict, "email_taken", "Email sudah terdaftar.")
+		} else {
+			fail(c, http.StatusConflict, "username_taken", "Username sudah dipakai.")
+		}
 		return
 	} else if err != nil {
 		serverError(c, err)
 		return
 	}
-	if err := s.sendVerification(c, s.DB, id, in.Email, in.Name); err != nil {
-		_ = c.Error(err) // gagal kirim verifikasi tidak menggagalkan pendaftaran; bisa dikirim ulang
-	}
-	s.startSession(c, id, http.StatusCreated, in.Email, in.Name)
+	s.startSession(c, id, http.StatusCreated, in.Username, in.Email, in.Name)
 }
 
 func (s *Server) login(c *gin.Context) {
@@ -91,30 +105,30 @@ func (s *Server) login(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "bad_request", "Body tidak valid.")
 		return
 	}
-	email := strings.ToLower(strings.TrimSpace(in.Email))
-	var id, hash, name, status string
-	err := s.DB.QueryRow(c, `SELECT id::text, password_hash, name, status FROM users WHERE email = $1 AND deleted_at IS NULL`, email).
-		Scan(&id, &hash, &name, &status)
+	username := strings.ToLower(strings.TrimSpace(in.Username))
+	var id, hash, name, status, email string
+	err := s.DB.QueryRow(c, `SELECT id::text, password_hash, name, status, email::text FROM users WHERE username = $1 AND deleted_at IS NULL`, username).
+		Scan(&id, &hash, &name, &status, &email)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(in.Password))
-		fail(c, http.StatusUnauthorized, "invalid_credentials", "Email atau password salah.")
+		fail(c, http.StatusUnauthorized, "invalid_credentials", "Username atau password salah.")
 		return
 	} else if err != nil {
 		serverError(c, err)
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(in.Password)) != nil {
-		fail(c, http.StatusUnauthorized, "invalid_credentials", "Email atau password salah.")
+		fail(c, http.StatusUnauthorized, "invalid_credentials", "Username atau password salah.")
 		return
 	}
 	if status != "active" {
 		fail(c, http.StatusForbidden, "account_suspended", "Akun ditangguhkan. Hubungi Convera.")
 		return
 	}
-	s.startSession(c, id, http.StatusOK, email, name)
+	s.startSession(c, id, http.StatusOK, username, email, name)
 }
 
-func (s *Server) startSession(c *gin.Context, userID string, status int, email, name string) {
+func (s *Server) startSession(c *gin.Context, userID string, status int, username, email, name string) {
 	token, err1 := secure.RandomToken(32)
 	csrf, err2 := secure.RandomToken(16)
 	if err1 != nil || err2 != nil {
@@ -133,7 +147,7 @@ func (s *Server) startSession(c *gin.Context, userID string, status int, email, 
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(sessionCookie, token, max, "/", s.Cfg.CookieDomain, s.Cfg.CookieSecure, true) // httpOnly
 	c.SetCookie(csrfCookie, csrf, max, "/", s.Cfg.CookieDomain, s.Cfg.CookieSecure, false)    // dibaca JS untuk X-CSRF-Token
-	okStatus(c, status, gin.H{"user": gin.H{"id": userID, "email": email, "name": name}, "csrf_token": csrf})
+	okStatus(c, status, gin.H{"user": gin.H{"id": userID, "username": username, "email": email, "name": name}, "csrf_token": csrf})
 }
 
 func (s *Server) logout(c *gin.Context) {
@@ -152,12 +166,12 @@ func (s *Server) logout(c *gin.Context) {
 }
 
 func (s *Server) session(c *gin.Context) {
-	var email, name string
-	if err := s.DB.QueryRow(c, `SELECT email::text, name FROM users WHERE id = $1`, c.GetString("user_id")).Scan(&email, &name); err != nil {
+	var username, email, name string
+	if err := s.DB.QueryRow(c, `SELECT username::text, email::text, name FROM users WHERE id = $1`, c.GetString("user_id")).Scan(&username, &email, &name); err != nil {
 		serverError(c, err)
 		return
 	}
-	out := gin.H{"user": gin.H{"id": c.GetString("user_id"), "email": email, "name": name}}
+	out := gin.H{"user": gin.H{"id": c.GetString("user_id"), "username": username, "email": email, "name": name}}
 	if isSupport(c) {
 		var slug, wsName string
 		var exp time.Time

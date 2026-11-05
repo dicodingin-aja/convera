@@ -61,6 +61,7 @@ func (s *Server) Router() *gin.Engine {
 	a.POST("/customers/:id/extend", s.extendCustomer)
 	a.POST("/customers/:id/stop", s.stopCustomer)
 	a.POST("/customers/:id/support-access", s.requireSuper(), s.supportAccess)
+	a.POST("/customers/:id/reset-password", s.requireSuper(), s.resetCustomerPassword)
 
 	a.GET("/events", s.listEvents)
 	a.GET("/events/:id", s.getEvent)

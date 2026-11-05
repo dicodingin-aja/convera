@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dicodingin-aja/convera/backend/internal/core"
-	"github.com/dicodingin-aja/convera/backend/internal/mail"
 	"github.com/dicodingin-aja/convera/backend/internal/secure"
 	"github.com/dicodingin-aja/convera/backend/internal/wa"
 	"github.com/gin-gonic/gin"
@@ -16,212 +14,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const (
-	resetTTL  = time.Hour
-	verifyTTL = 48 * time.Hour
-)
-
 func oneLine(s string) string {
 	return strings.NewReplacer("\r", " ", "\n", " ", "\x00", "").Replace(s)
 }
 
 func validPassword(p string) bool { return len(p) >= 8 && len(p) <= 72 }
-
-// ---------- Verifikasi email ----------
-
-// sendVerification membuat token verifikasi (hash disimpan) dan mengirim tautan. Token lama yang belum dipakai dicabut.
-func (s *Server) sendVerification(ctx context.Context, db core.DBTX, userID, email, name string) error {
-	tok, err := secure.RandomToken(32)
-	if err != nil {
-		return err
-	}
-	if _, err := db.Exec(ctx, `UPDATE email_verifications SET used_at = now() WHERE user_id::text = $1 AND used_at IS NULL`, userID); err != nil {
-		return err
-	}
-	if _, err := db.Exec(ctx, `INSERT INTO email_verifications (user_id, email, token_hash, expires_at) VALUES ($1::uuid, $2, $3, $4)`,
-		userID, email, secure.HashToken(tok), time.Now().Add(verifyTTL)); err != nil {
-		return err
-	}
-	mail.SendAsync(s.Mail, email, "Verifikasi email Convera",
-		"Halo "+oneLine(name)+",\n\nKlik tautan berikut untuk memverifikasi email Anda (berlaku 48 jam):\n"+
-			s.Cfg.AppURL+"/?verify="+tok+"\n\nJika Anda tidak mendaftar di Convera, abaikan email ini.\n\nSalam,\nTim Convera")
-	return nil
-}
-
-// verifyEmail: POST {token}. Menandai email terverifikasi bila token valid dan email masih sama dengan akun.
-func (s *Server) verifyEmail(c *gin.Context) {
-	var in struct {
-		Token string `json:"token"`
-	}
-	if err := c.ShouldBindJSON(&in); err != nil || in.Token == "" {
-		fail(c, http.StatusBadRequest, "bad_request", "Token wajib diisi.")
-		return
-	}
-	tx, err := s.DB.Begin(c)
-	if err != nil {
-		serverError(c, err)
-		return
-	}
-	defer tx.Rollback(c)
-	var id, userID, email string
-	err = tx.QueryRow(c, `SELECT id::text, user_id::text, email::text FROM email_verifications
-		WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() FOR UPDATE`, secure.HashToken(in.Token)).Scan(&id, &userID, &email)
-	if errors.Is(err, pgx.ErrNoRows) {
-		fail(c, http.StatusBadRequest, "invalid_token", "Tautan verifikasi tidak valid atau sudah kedaluwarsa.")
-		return
-	} else if err != nil {
-		serverError(c, err)
-		return
-	}
-	if _, err := tx.Exec(c, `UPDATE email_verifications SET used_at = now() WHERE id::text = $1`, id); err != nil {
-		serverError(c, err)
-		return
-	}
-	// Hanya bila email yang diverifikasi masih email akun saat ini.
-	if _, err := tx.Exec(c, `UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()) WHERE id::text = $1 AND email = $2 AND deleted_at IS NULL`, userID, email); err != nil {
-		serverError(c, err)
-		return
-	}
-	if err := tx.Commit(c); err != nil {
-		serverError(c, err)
-		return
-	}
-	ok(c, gin.H{"verified": true})
-}
-
-func (s *Server) resendVerification(c *gin.Context) {
-	if !s.limiter("resend|"+c.GetString("user_id"), 3.0/3600, 3).Allow() {
-		fail(c, http.StatusTooManyRequests, "rate_limited", "Terlalu sering meminta email verifikasi. Coba lagi nanti.")
-		return
-	}
-	var email, name string
-	var verified *time.Time
-	if err := s.DB.QueryRow(c, `SELECT email::text, name, email_verified_at FROM users WHERE id::text = $1`, c.GetString("user_id")).Scan(&email, &name, &verified); err != nil {
-		serverError(c, err)
-		return
-	}
-	if verified != nil {
-		ok(c, gin.H{"already_verified": true})
-		return
-	}
-	if err := s.sendVerification(c, s.DB, c.GetString("user_id"), email, name); err != nil {
-		serverError(c, err)
-		return
-	}
-	ok(c, gin.H{"sent": true})
-}
-
-// ---------- Lupa / reset password ----------
-
-// forgotPassword selalu menjawab sama (tidak membocorkan apakah email terdaftar).
-func (s *Server) forgotPassword(c *gin.Context) {
-	var in struct {
-		Email string `json:"email"`
-	}
-	if err := c.ShouldBindJSON(&in); err != nil {
-		fail(c, http.StatusBadRequest, "bad_request", "Body tidak valid.")
-		return
-	}
-	email := strings.ToLower(strings.TrimSpace(in.Email))
-	done := func() { ok(c, gin.H{"message": "Jika email terdaftar, tautan reset password sudah dikirim."}) }
-	if !emailRe.MatchString(email) || !s.limiter("forgot|"+email, 3.0/3600, 3).Allow() {
-		done()
-		return
-	}
-	var id, name string
-	err := s.DB.QueryRow(c, `SELECT id::text, name FROM users WHERE email = $1 AND deleted_at IS NULL AND status = 'active'`, email).Scan(&id, &name)
-	if errors.Is(err, pgx.ErrNoRows) {
-		done()
-		return
-	} else if err != nil {
-		serverError(c, err)
-		return
-	}
-	tok, err := secure.RandomToken(32)
-	if err != nil {
-		serverError(c, err)
-		return
-	}
-	tx, err := s.DB.Begin(c)
-	if err != nil {
-		serverError(c, err)
-		return
-	}
-	defer tx.Rollback(c)
-	if _, err := tx.Exec(c, `UPDATE password_resets SET used_at = now() WHERE user_id::text = $1 AND used_at IS NULL`, id); err != nil {
-		serverError(c, err)
-		return
-	}
-	if _, err := tx.Exec(c, `INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1::uuid, $2, $3)`, id, secure.HashToken(tok), time.Now().Add(resetTTL)); err != nil {
-		serverError(c, err)
-		return
-	}
-	if err := tx.Commit(c); err != nil {
-		serverError(c, err)
-		return
-	}
-	mail.SendAsync(s.Mail, email, "Reset password Convera",
-		"Halo "+oneLine(name)+",\n\nKami menerima permintaan reset password. Klik tautan berikut (berlaku 1 jam, sekali pakai):\n"+
-			s.Cfg.AppURL+"/?reset="+tok+"\n\nJika bukan Anda, abaikan email ini; password Anda tidak berubah.\n\nSalam,\nTim Convera")
-	done()
-}
-
-// resetPassword: POST {token, password}. Token sekali pakai; semua sesi lama dicabut.
-func (s *Server) resetPassword(c *gin.Context) {
-	var in struct {
-		Token    string `json:"token"`
-		Password string `json:"password"`
-	}
-	if err := c.ShouldBindJSON(&in); err != nil || in.Token == "" {
-		fail(c, http.StatusBadRequest, "bad_request", "Token dan password wajib diisi.")
-		return
-	}
-	if !validPassword(in.Password) {
-		fail(c, http.StatusUnprocessableEntity, "validation_error", "Password 8 sampai 72 karakter.")
-		return
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
-	if err != nil {
-		serverError(c, err)
-		return
-	}
-	tx, err := s.DB.Begin(c)
-	if err != nil {
-		serverError(c, err)
-		return
-	}
-	defer tx.Rollback(c)
-	var id, userID string
-	err = tx.QueryRow(c, `SELECT id::text, user_id::text FROM password_resets WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() FOR UPDATE`,
-		secure.HashToken(in.Token)).Scan(&id, &userID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		fail(c, http.StatusBadRequest, "invalid_token", "Tautan reset tidak valid atau sudah kedaluwarsa.")
-		return
-	} else if err != nil {
-		serverError(c, err)
-		return
-	}
-	// Terima lewat email membuktikan kepemilikan alamat itu, jadi sekalian dianggap terverifikasi.
-	steps := []struct {
-		sql  string
-		args []any
-	}{
-		{`UPDATE password_resets SET used_at = now() WHERE id::text = $1`, []any{id}},
-		{`UPDATE users SET password_hash = $2, email_verified_at = COALESCE(email_verified_at, now()) WHERE id::text = $1 AND deleted_at IS NULL`, []any{userID, string(hash)}},
-		{`UPDATE sessions SET revoked_at = now() WHERE user_id::text = $1 AND revoked_at IS NULL`, []any{userID}},
-	}
-	for _, st := range steps {
-		if _, err := tx.Exec(c, st.sql, st.args...); err != nil {
-			serverError(c, err)
-			return
-		}
-	}
-	if err := tx.Commit(c); err != nil {
-		serverError(c, err)
-		return
-	}
-	ok(c, gin.H{"reset": true})
-}
 
 // ---------- Sesi: refresh & CSRF ----------
 
@@ -292,7 +89,7 @@ func (s *Server) heartbeat(c *gin.Context) {
 // ---------- Profil & password ----------
 
 func (s *Server) getProfile(c *gin.Context) {
-	rows, err := query(c, s.DB, `SELECT id::text AS id, email::text AS email, name, phone, (email_verified_at IS NOT NULL) AS email_verified, created_at
+	rows, err := query(c, s.DB, `SELECT id::text AS id, username::text AS username, email::text AS email, name, phone, created_at
 		FROM users WHERE id::text = $1`, c.GetString("user_id"))
 	if err != nil || len(rows) == 0 {
 		serverError(c, errors.Join(err, errors.New("profil tidak ditemukan")))
@@ -536,7 +333,7 @@ func (s *Server) deleteWorkspace(c *gin.Context) {
 }
 
 // deleteAccount: DELETE /me {password}. Menghapus semua workspace milik user (lihat purgeWorkspace), menonaktifkan
-// akun (email bisa dipakai mendaftar lagi), dan mencabut semua sesi.
+// akun (username bisa dipakai mendaftar lagi), dan mencabut semua sesi.
 func (s *Server) deleteAccount(c *gin.Context) {
 	var in struct {
 		Password string `json:"password"`
@@ -589,11 +386,10 @@ func (s *Server) deleteAccount(c *gin.Context) {
 	for _, q := range []string{
 		`UPDATE sessions SET revoked_at = now() WHERE user_id::text = $1 AND revoked_at IS NULL`,
 		`DELETE FROM notifications WHERE user_id::text = $1`,
-		`DELETE FROM password_resets WHERE user_id::text = $1`,
-		`DELETE FROM email_verifications WHERE user_id::text = $1`,
 		// Anonimkan data pribadi; baris dipertahankan karena payments/payment_proofs merujuknya.
 		`UPDATE users SET deleted_at = now(), status = 'suspended', name = 'Akun dihapus', phone = NULL, password_hash = '!',
-			email = 'deleted-' || id::text || '@deleted.invalid', email_verified_at = NULL WHERE id::text = $1`,
+			username = 'deleted-' || substr(replace(id::text, '-', ''), 1, 12),
+			email = 'deleted-' || id::text || '@deleted.invalid' WHERE id::text = $1`,
 	} {
 		if _, err := tx.Exec(c, q, c.GetString("user_id")); err != nil {
 			serverError(c, err)

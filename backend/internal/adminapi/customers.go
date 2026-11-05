@@ -26,7 +26,7 @@ LEFT JOIN sales_people sp ON sp.id = sub.sales_id
 CROSS JOIN LATERAL (SELECT ` + effectiveStatus + ` AS status) eff
 WHERE w.deleted_at IS NULL`
 
-const customerCols = `w.id::text AS id, w.slug, w.name, u.name AS owner, w.city, u.phone, u.email::text AS email,
+const customerCols = `w.id::text AS id, w.slug, w.name, u.name AS owner, w.city, u.phone, u.username::text AS username, u.email::text AS email,
   eff.status AS status, p.code AS plan, p.name AS plan_name, p.price_month::float8 AS plan_price,
   CASE WHEN eff.status IN ('active', 'expired', 'stopped') THEN sub.current_period_end END AS until,
   sub.trial_until, sp.name AS sales, u.last_seen_at,
@@ -114,7 +114,7 @@ func (s *Server) customerWhere(c *gin.Context) (*httpx.Where, bool) {
 		w.Raw(cond)
 	}
 	if q := strings.TrimSpace(c.Query("q")); q != "" {
-		w.Add(`(w.name ILIKE '%' || ? || '%' OR u.name ILIKE '%' || ? || '%' OR w.city ILIKE '%' || ? || '%' OR u.email::text ILIKE '%' || ? || '%')`, httpx.EscapeLike(q))
+		w.Add(`(w.name ILIKE '%' || ? || '%' OR u.name ILIKE '%' || ? || '%' OR w.city ILIKE '%' || ? || '%' OR u.username::text ILIKE '%' || ? || '%' OR u.email::text ILIKE '%' || ? || '%')`, httpx.EscapeLike(q))
 		// keempat "?" diganti placeholder yang sama ($n): satu nilai dipakai untuk empat kolom
 	}
 	return w, true
@@ -215,10 +215,10 @@ func (s *Server) exportCustomers(c *gin.Context) {
 		httpx.ServerError(c, err)
 		return
 	}
-	head := []string{"Bisnis", "Pemilik", "Email", "Kota", "Status", "Paket", "Sales", "Berlaku s/d"}
+	head := []string{"Bisnis", "Pemilik", "Username", "Email", "Telepon", "Kota", "Status", "Paket", "Sales", "Berlaku s/d"}
 	data := [][]string{head}
 	for _, r := range rows {
-		data = append(data, []string{str(r["name"]), str(r["owner"]), str(r["email"]), str(r["city"]), str(r["status"]),
+		data = append(data, []string{str(r["name"]), str(r["owner"]), str(r["username"]), str(r["email"]), str(r["phone"]), str(r["city"]), str(r["status"]),
 			str(r["plan_name"]), str(r["sales"]), dateStr(r["until"])})
 	}
 	writeCSV(c, "customer.csv", data)

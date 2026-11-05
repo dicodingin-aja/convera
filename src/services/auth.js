@@ -1,7 +1,7 @@
 import { appConfig } from './config.js';
 import { requestJson } from './api.js';
 import { ENDPOINTS, clearWorkspaceCache } from './backend.js';
-import { isEmail } from './validators.js';
+import { isUsername, isEmail, isPhone } from './validators.js';
 
 // Sesi login. Mode demo (VITE_BACKEND_ENABLED=false): sesi disimpan di localStorage dan
 // kredensial TIDAK diverifikasi ke server. Mode backend: POST /api/v1/auth/login dan POST /api/v1/auth/logout.
@@ -11,37 +11,39 @@ export function getSession() {
   try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch { return null; }
 }
 
-function nameFromEmail(email) {
-  const local = email.split('@')[0].replace(/[._-]+/g, ' ').trim();
-  return local.replace(/\b\w/g, (c) => c.toUpperCase()) || 'Pengguna';
-}
+const USERNAME_HINT = 'Username 3-30 karakter: huruf kecil, angka, titik, garis bawah, atau strip; diawali huruf atau angka';
 
-export async function login(email, password) {
-  email = String(email).trim().toLowerCase();
-  if (!isEmail(email)) throw new Error('Format email tidak valid');
+export async function login(username, password) {
+  username = String(username).trim().toLowerCase();
+  if (!username) throw new Error('Username wajib diisi');
   if (!password) throw new Error('Password wajib diisi');
   let user;
   if (appConfig.backendEnabled) {
-    const res = await requestJson(ENDPOINTS.login, { method: 'POST', body: JSON.stringify({ email, password }) });
-    user = res?.data?.user || res?.user || { email };
+    const res = await requestJson(ENDPOINTS.login, { method: 'POST', body: JSON.stringify({ username, password }) });
+    user = res?.data?.user || res?.user || { username };
   } else {
     if (password.length < 6) throw new Error('Password minimal 6 karakter');
-    user = { email, name: nameFromEmail(email) };
+    user = { username, name: username };
   }
-  const session = { email: user.email || email, name: user.name || nameFromEmail(email), at: new Date().toISOString() };
+  const session = { username: user.username || username, email: user.email || '', name: user.name || username, at: new Date().toISOString() };
   try { localStorage.setItem(KEY, JSON.stringify(session)); } catch {}
   return session;
 }
 
 // Daftar akun baru (hanya mode backend). Server langsung membuat sesi login.
-export async function register(name, email, password) {
-  email = String(email).trim().toLowerCase();
-  if (!String(name).trim()) throw new Error('Nama wajib diisi');
+export async function register({ name, username, email, phone, password }) {
+  name = String(name || '').trim();
+  username = String(username || '').trim().toLowerCase();
+  email = String(email || '').trim().toLowerCase();
+  phone = String(phone || '').trim();
+  if (!name) throw new Error('Nama wajib diisi');
+  if (!isUsername(username)) throw new Error(USERNAME_HINT);
   if (!isEmail(email)) throw new Error('Format email tidak valid');
+  if (!isPhone(phone)) throw new Error('Nomor telepon tidak valid');
   if (String(password).length < 8) throw new Error('Password minimal 8 karakter');
-  const res = await requestJson(ENDPOINTS.register, { method: 'POST', body: JSON.stringify({ name: String(name).trim(), email, password }) });
-  const user = res?.data?.user || { email, name };
-  const session = { email: user.email || email, name: user.name || name, at: new Date().toISOString() };
+  const res = await requestJson(ENDPOINTS.register, { method: 'POST', body: JSON.stringify({ name, username, email, phone, password }) });
+  const user = res?.data?.user || { username, email, name };
+  const session = { username: user.username || username, email: user.email || email, name: user.name || name, at: new Date().toISOString() };
   try { localStorage.setItem(KEY, JSON.stringify(session)); } catch {}
   return session;
 }
@@ -52,7 +54,7 @@ export async function supportLogin(code) {
   const u = res?.data?.user || {};
   const sup = res?.data?.support || {};
   const session = {
-    email: u.email, name: u.name, at: new Date().toISOString(),
+    username: u.username, email: u.email, name: u.name, at: new Date().toISOString(),
     support: { admin: sup.admin, workspace: sup.workspace, workspaceName: sup.workspace_name, expiresAt: sup.expires_at },
   };
   try { localStorage.setItem(KEY, JSON.stringify(session)); } catch {}
@@ -72,21 +74,3 @@ export async function logout() {
 }
 
 export const initials = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
-
-// ---- Lupa password, reset, dan verifikasi email (hanya mode backend) ----
-
-export async function forgotPassword(email) {
-  email = String(email).trim().toLowerCase();
-  if (!isEmail(email)) throw new Error('Format email tidak valid');
-  const res = await requestJson(ENDPOINTS.forgot, { method: 'POST', body: JSON.stringify({ email }) });
-  return res?.data?.message || 'Jika email terdaftar, tautan reset password sudah dikirim.';
-}
-
-export async function resetPassword(token, password) {
-  if (String(password).length < 8) throw new Error('Password minimal 8 karakter');
-  await requestJson(ENDPOINTS.reset, { method: 'POST', body: JSON.stringify({ token, password }) });
-}
-
-export async function verifyEmail(token) {
-  await requestJson(ENDPOINTS.verify, { method: 'POST', body: JSON.stringify({ token }) });
-}

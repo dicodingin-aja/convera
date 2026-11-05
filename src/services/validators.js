@@ -1,3 +1,5 @@
+export const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/;
+export const isUsername = (s) => USERNAME_RE.test(String(s).trim().toLowerCase());
 export const isEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(s).trim());
 export const normPhone = (p) => { let d = String(p).replace(/\D/g, ''); if (d.startsWith('0')) d = '62' + d.slice(1); else if (d.startsWith('8')) d = '62' + d; return d; };
 export const isPhone = (s) => { const d = normPhone(s); return /^62\d{8,13}$/.test(d); };

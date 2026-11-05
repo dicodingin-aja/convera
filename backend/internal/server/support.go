@@ -17,17 +17,16 @@ const supportSessionTTL = 2 * time.Hour
 // supportBlocked: tindakan yang tidak boleh dilakukan admin atas nama customer, apa pun alasannya:
 // mengubah kredensial/profil, menghapus data, membuat workspace baru, mengunggah bukti bayar, dan membuat API key.
 var supportBlocked = map[string]bool{
-	"POST /api/v1/auth/refresh":             true,
-	"POST /api/v1/auth/resend-verification": true,
-	"PATCH /api/v1/me/profile":              true,
-	"POST /api/v1/me/password":              true,
-	"DELETE /api/v1/me":                     true,
-	"POST /api/v1/workspaces":               true,
-	"DELETE /api/v1/workspaces/:slug":       true,
-	"POST /api/v1/payment-proofs":           true,
-	"POST /api/v1/leads/erase":              true,
-	"POST /api/v1/api-keys":                 true,
-	"DELETE /api/v1/api-keys/:id":           true,
+	"POST /api/v1/auth/refresh":       true,
+	"PATCH /api/v1/me/profile":        true,
+	"POST /api/v1/me/password":        true,
+	"DELETE /api/v1/me":               true,
+	"POST /api/v1/workspaces":         true,
+	"DELETE /api/v1/workspaces/:slug": true,
+	"POST /api/v1/payment-proofs":     true,
+	"POST /api/v1/leads/erase":        true,
+	"POST /api/v1/api-keys":           true,
+	"DELETE /api/v1/api-keys/:id":     true,
 }
 
 func isSupport(c *gin.Context) bool { return c.GetString("support_admin_id") != "" }
@@ -76,15 +75,15 @@ func (s *Server) supportLogin(c *gin.Context) {
 		return
 	}
 	defer tx.Rollback(c)
-	var codeID, adminID, wsID, userID, reason, adminName, wsSlug, wsName, email, name string
+	var codeID, adminID, wsID, userID, reason, adminName, wsSlug, wsName, username, email, name string
 	err = tx.QueryRow(c, `
-SELECT sc.id::text, sc.admin_id::text, sc.workspace_id::text, sc.user_id::text, sc.reason, a.name, w.slug, w.name, u.email::text, u.name
+SELECT sc.id::text, sc.admin_id::text, sc.workspace_id::text, sc.user_id::text, sc.reason, a.name, w.slug, w.name, u.username::text, u.email::text, u.name
 FROM support_access_codes sc
 JOIN admins a ON a.id = sc.admin_id AND a.status = 'active'
 JOIN workspaces w ON w.id = sc.workspace_id AND w.deleted_at IS NULL
 JOIN users u ON u.id = sc.user_id AND u.deleted_at IS NULL AND u.status = 'active'
 WHERE sc.token_hash = $1 AND sc.used_at IS NULL AND sc.expires_at > now() FOR UPDATE OF sc`, secure.HashToken(in.Code)).
-		Scan(&codeID, &adminID, &wsID, &userID, &reason, &adminName, &wsSlug, &wsName, &email, &name)
+		Scan(&codeID, &adminID, &wsID, &userID, &reason, &adminName, &wsSlug, &wsName, &username, &email, &name)
 	if errors.Is(err, pgx.ErrNoRows) {
 		fail(c, http.StatusBadRequest, "invalid_code", "Tautan dukungan tidak valid, sudah dipakai, atau kedaluwarsa. Buat tautan baru dari Convera Admin.")
 		return
@@ -123,7 +122,7 @@ WHERE sc.token_hash = $1 AND sc.used_at IS NULL AND sc.expires_at > now() FOR UP
 	c.SetCookie(sessionCookie, tok, int(supportSessionTTL.Seconds()), "/", s.Cfg.CookieDomain, s.Cfg.CookieSecure, true)
 	c.SetCookie(csrfCookie, csrf, int(supportSessionTTL.Seconds()), "/", s.Cfg.CookieDomain, s.Cfg.CookieSecure, false)
 	ok(c, gin.H{
-		"user":       gin.H{"email": email, "name": name},
+		"user":       gin.H{"username": username, "email": email, "name": name},
 		"csrf_token": csrf,
 		"support":    gin.H{"admin": adminName, "workspace": wsSlug, "workspace_name": wsName, "expires_at": expires},
 	})

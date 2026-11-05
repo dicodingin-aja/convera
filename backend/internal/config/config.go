@@ -15,9 +15,8 @@ type Config struct {
 	DatabaseURL string
 	Addr        string
 	AdminAddr   string // API Convera Admin (proses terpisah)
-	// Email transaksional. SMTPHost kosong = mode log (pengembangan). AppURL dipakai untuk tautan di email.
-	SMTPHost, SMTPPort, SMTPUser, SMTPPass, MailFrom string
-	AppURL                                           string
+	// AppURL dipakai untuk tautan dukungan (Convera Admin) dan tautan di notifikasi.
+	AppURL string
 
 	// UploadDir: folder privat bukti transfer. API customer menulis, API admin membaca (volume yang sama).
 	UploadDir  string
@@ -77,11 +76,6 @@ func Load(needGraph bool) (*Config, error) {
 		Addr:            env("API_ADDR", ":8080"),
 		AdminAddr:       env("ADMIN_ADDR", ":8081"),
 		UploadDir:       env("UPLOAD_DIR", "./data/uploads"),
-		SMTPHost:        os.Getenv("SMTP_HOST"),
-		SMTPPort:        os.Getenv("SMTP_PORT"),
-		SMTPUser:        os.Getenv("SMTP_USER"),
-		SMTPPass:        os.Getenv("SMTP_PASS"),
-		MailFrom:        env("MAIL_FROM", "Convera <no-reply@localhost>"),
 		AppURL:          strings.TrimRight(env("APP_URL", "http://localhost:5173"), "/"),
 		GraphAPIVersion: os.Getenv("GRAPH_API_VERSION"),
 		GraphBaseURL:    env("GRAPH_BASE_URL", "https://graph.facebook.com"),

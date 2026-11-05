@@ -69,7 +69,7 @@ Idempoten lewat `webhook_inbox (provider, message_id)`.
 - `GRAPH_API_VERSION` harus diisi manual; heuristik terjemahan error Meta belum diverifikasi dengan respons asli.
 - Payload WABA dan format Test Events belum diuji ke Meta sungguhan (hanya ke server tiruan).
 - Verifikasi signature Kirim.chat belum ada; baru WhatsApp Cloud API.
-- Refresh token sesi, verifikasi email, reset password, dan endpoint admin belum dibuat.
+- Endpoint admin ada di ADMIN_API.md.
 - Frontend belum disambungkan ke endpoint ini (masih mock, halaman Koneksi masih menyimpan token di localStorage).
 
 ## Unggah bukti transfer
@@ -96,9 +96,7 @@ Idempoten lewat `webhook_inbox (provider, message_id)`.
 
 | Route | Fungsi |
 |---|---|
-| `POST /auth/forgot-password` | Selalu menjawab sama (tidak membocorkan email terdaftar); tautan berlaku 1 jam, sekali pakai |
-| `POST /auth/reset-password` | `{token, password}`; mencabut semua sesi lama |
-| `POST /auth/verify-email`, `POST /auth/resend-verification` | Verifikasi email (tautan 48 jam). Belum membatasi fitur apa pun |
+| `POST /auth/register`, `POST /auth/login` | Login `{username, password}`. Register `{name, username, email, phone, password}`, semua wajib: username `^[a-z0-9][a-z0-9._-]{2,29}$`, email valid dan unik (409 `email_taken`), telepon dinormalisasi `62...`, password 8-72 karakter. Email hanya data kontak: tanpa verifikasi dan tanpa kirim email; reset password dilakukan superadmin (ADMIN_API.md) |
 | `POST /auth/refresh`, `GET /auth/csrf` | Memutar token sesi (token lama dicabut); membaca token CSRF |
 | `GET/PATCH /me/profile`, `POST /me/password` | Profil (nama, telepon dinormalisasi 62...), ganti password (sesi lain dicabut) |
 | `GET/PATCH/DELETE /workspaces/{slug}` | Detail, ubah, dan hapus workspace (`{confirm: slug}`) |
@@ -119,7 +117,7 @@ pembukuan; lama simpannya belum diputuskan (bab 13).
 |---|---|---|
 | Kedaluwarsa langganan | tiap 5 menit | active melewati masa tenggang / trial lewat -> `expired` + notifikasi |
 | Rekap harian | tiap 5 menit (2 hari), tiap jam (35 hari) | `daily_stats` per workspace (hari Asia/Jakarta); Overview membacanya |
-| Pengingat | tiap jam | Langganan & trial H-7/H-3/H-1, token Meta H-7/H-1, token kedaluwarsa -> status `expired`. Lonceng + email; sekali per tanggal berakhir (`reminder_log`) |
+| Pengingat | tiap jam | Langganan & trial H-7/H-3/H-1, token Meta H-7/H-1, token kedaluwarsa -> status `expired`. Lonceng (notifikasi dalam aplikasi); sekali per tanggal berakhir (`reminder_log`) |
 | Retensi | tiap 24 jam | Hapus event lama (`retention_event_days`, default 365, min. 60), `webhook_inbox` (default 30), sesi & token kedaluwarsa, notifikasi lama yang sudah dibaca. Data keuangan tidak disentuh |
 
 Isi `token_expires_at` di `PUT /connections/meta` (tanggal berlaku token bila Meta menyebutnya) agar pengingat token jalan.
@@ -133,3 +131,10 @@ Token System User yang tidak kedaluwarsa dibiarkan kosong.
 | `POST /leads/bulk-status` | `{ids, status}` hanya `lost` (bukan dari purchase) atau `new` (memulihkan yang hilang) |
 | `POST /leads/erase` | `{phone}` menghapus permanen lead dengan nomor itu + event-nya di workspace ini (UU PDP); audit hanya menyimpan nomor tersamar. Diblokir dalam mode dukungan |
 | `GET /events`, `GET /events/{id}` | Ditambah `event_id`, `ctwa_clid`, dan `hint` (penjelasan + saran untuk customer per kode error) |
+
+## Laporan harian (`GET /reports/daily`)
+
+Header `X-Workspace` seperti endpoint dashboard lain. Query: `month=YYYY-MM` (satu bulan penuh, WIB) atau `from`/`to` (`YYYY-MM-DD`, maks. 366 hari); opsional `source` (nilai `leads.source`, mis. `qr`, `webhook`, `organic`) dan `status` (`new|lead|checkout|purchase|lost`).
+
+Respons `data`: `range`, `filters`, `sources` (sumber yang ada di workspace), `days[]` `{date, conversations, from_ads, purchases, revenue, events_sent, events_failed}`, `total`, `by_event[]` `{event_name, total, sent, failed, other, value}`.
+Purchase dan revenue hanya dari event `Purchase` berstatus terkirim; event tes koneksi tidak dihitung; filter berlaku lewat lead.

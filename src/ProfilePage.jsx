@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { isEmail, isPhone, checkPassword } from './services/validators.js';
+import { isPhone, checkPassword } from './services/validators.js';
 import { getSub, subInfo } from './plans.js';
 
 const field = { width: '100%', height: 42, padding: '0 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--input)', color: 'var(--text)', fontFamily: 'inherit', fontSize: 14, outline: 'none', boxSizing: 'border-box' };
@@ -8,7 +8,7 @@ const label = { display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, 
 const ghost = { fontFamily: 'inherit', height: 36, padding: '0 14px', border: 0, borderRadius: 8, background: 'var(--surface)', color: 'var(--text)', fontSize: 13, cursor: 'pointer' };
 
 function ProfileForm({ profile, onSave }) {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', ...profile });
+  const [form, setForm] = useState({ name: '', username: '', email: '', phone: '', ...profile });
   const [pw, setPw] = useState({ current: '', next: '', again: '' });
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -19,7 +19,6 @@ function ProfileForm({ profile, onSave }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return setError('Nama wajib diisi');
-    if (!isEmail(form.email)) return setError('Format email tidak valid');
     if (form.phone && !isPhone(form.phone)) return setError('Nomor telepon tidak valid');
     if (pw.current || pw.next || pw.again) {
       const pe = checkPassword(pw.current, pw.next, pw.again);
@@ -27,7 +26,7 @@ function ProfileForm({ profile, onSave }) {
     }
     setSaving(true);
     try {
-      await onSave({ name: form.name.trim(), email: form.email.trim().toLowerCase(), phone: form.phone.trim(), ...(pw.next ? { passwordUpdatedAt: new Date().toISOString() } : {}) });
+      await onSave({ name: form.name.trim(), phone: form.phone.trim(), ...(pw.next ? { passwordUpdatedAt: new Date().toISOString() } : {}) });
     } catch (err) { setSaving(false); return setError(err.message || 'Profil tidak dapat disimpan'); }
     setSaving(false); setPw({ current: '', next: '', again: '' }); setError(''); setSaved(true);
     window.setTimeout(() => setSaved(false), 2500);
@@ -36,7 +35,9 @@ function ProfileForm({ profile, onSave }) {
   return (
     <form onSubmit={submit} style={card}>
       <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Profil</h2>
-      {[['name', 'Nama lengkap', 'text'], ['email', 'Email', 'email'], ['phone', 'Nomor telepon', 'tel']].map(([k, l, type]) => (
+      <label style={label}>Username<input value={form.username || ''} readOnly disabled style={{ ...field, opacity: 0.7 }} /></label>
+      <label style={label}>Email<input value={form.email || ''} readOnly disabled style={{ ...field, opacity: 0.7 }} /></label>
+      {[['name', 'Nama lengkap', 'text'], ['phone', 'Nomor telepon', 'tel']].map(([k, l, type]) => (
         <label key={k} style={label}>{l}<input value={form[k]} onChange={upd(k)} type={type} style={field} /></label>
       ))}
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>

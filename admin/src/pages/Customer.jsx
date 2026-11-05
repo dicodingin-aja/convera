@@ -6,7 +6,7 @@ import { daysFromNow, fmtDate, fmtShort, lastSeenText, rp } from '../calc.js';
 import { useAction, useData, useDebounced } from '../hooks.js';
 import ActivateModal from '../ActivateModal.jsx';
 import EventDetail, { statusOf as eventStatus } from '../EventDetail.jsx';
-import { EventsPanel, SupportAccessModal } from '../CustomerSupport.jsx';
+import { EventsPanel, ResetPasswordModal, SupportAccessModal } from '../CustomerSupport.jsx';
 
 const FILTERS = [['all', 'Semua'], ['online', 'Online'], ['offline', 'Offline'], ['active', 'Berlangganan'], ['expired', 'Tidak berlangganan'], ['trial', 'Trial'], ['pending', 'Menunggu']];
 
@@ -28,6 +28,7 @@ function Detail({ id, onClose, onChanged }) {
   const [evSel, setEvSel] = useState(null);
   const [showAll, setShowAll] = useState(false);
   const [support, setSupport] = useState(false);
+  const [reset, setReset] = useState(false);
   const { busy, error, run } = useAction();
   if (q.loading || q.error || !q.data) return <Modal title="Customer" wide onClose={onClose}><Loading error={q.error} /></Modal>;
   const d = q.data.data;
@@ -96,11 +97,13 @@ function Detail({ id, onClose, onChanged }) {
         <ErrorNote>{error}</ErrorNote>
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button className="btn" disabled={me.role !== 'superadmin'} title={me.role !== 'superadmin' ? 'Hanya superadmin yang bisa masuk ke dashboard customer' : 'Buka dashboard customer untuk membantu'} onClick={() => setSupport(true)}><Icon name="eye" size={18} />Masuk ke dashboard</button>
+          <button className="btn" disabled={me.role !== 'superadmin'} title={me.role !== 'superadmin' ? 'Hanya superadmin yang bisa reset password customer' : 'Buat password sementara untuk customer'} onClick={() => setReset(true)}><Icon name="lock" size={18} />Reset password</button>
           {canStop ? <button className="btn soft" disabled={busy} onClick={stop}>Hentikan langganan</button> : null}
           <button className="btn primary" onClick={() => setExt(true)}>{d.status === 'active' ? 'Perpanjang manual' : 'Aktifkan manual'}</button>
         </div>
       </Modal>
       {ext ? <ActivateModal customer={d} onClose={() => setExt(false)} onDone={() => { q.reload(); onChanged(); }} /> : null}
+      {reset ? <ResetPasswordModal customer={{ id, name: d.name, owner: d.owner }} onClose={() => setReset(false)} /> : null}
       {support ? <SupportAccessModal customer={{ id, name: d.name }} onClose={() => setSupport(false)} /> : null}
       {evSel ? <EventDetail id={evSel} onClose={() => setEvSel(null)} onChanged={() => { evq.reload(); q.reload(); }} /> : null}
     </>
@@ -132,7 +135,7 @@ export default function Customer() {
         <Kpi label="Online sekarang" value={counts?.online ?? '—'} />
       </div>
       <div className="row between">
-        <div className="field" style={{ flex: '1 1 320px', maxWidth: 420 }}><Icon name="search" size={18} /><input className="input bare" placeholder="Cari bisnis, pemilik, kota, atau email…" value={q} onChange={(e) => change(setQ)(e.target.value)} /></div>
+        <div className="field" style={{ flex: '1 1 320px', maxWidth: 420 }}><Icon name="search" size={18} /><input className="input bare" placeholder="Cari bisnis, pemilik, kota, username, atau email…" value={q} onChange={(e) => change(setQ)(e.target.value)} /></div>
         <button className="btn soft" onClick={() => download('/customers.csv' + qs({ filter: f === 'all' ? '' : f, q: dq.trim() }), 'customer.csv').then(() => setExportErr(''), (e) => setExportErr(e.message))}><Icon name="download" size={18} />Ekspor CSV</button>
       </div>
       <ErrorNote>{exportErr}</ErrorNote>

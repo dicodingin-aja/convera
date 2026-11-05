@@ -1,6 +1,6 @@
 # Checkpoint Convera — serah terima untuk yang melanjutkan
 
-Status per **5 November 2026**. Baca ini dulu. `backend/HANDOFF.md` adalah catatan lama (sebelum server API ada) dan sudah usang.
+Status per **5 November 2026** (diperbarui setelah 2.1 dan 2.2 selesai). Baca ini dulu. `backend/HANDOFF.md` adalah catatan lama (sebelum server API ada) dan sudah usang.
 Belum ada yang di-commit. Semua perubahan masih di working tree.
 
 Legenda: ✅ sudah dan **terbukti dites** · 🟡 sudah dibuat tapi **belum terbukti** di kondisi nyata · ⬜ belum dikerjakan
@@ -24,12 +24,12 @@ Env penting: `DATABASE_URL`, `ENCRYPTION_KEY` (base64 32 byte, `go run ./cmd/gen
 `QR_SERVICE_URL` + `QR_SERVICE_TOKEN` (API) dan `QR_SERVICE_TOKEN` + `CONVERA_API_URL` (waqr).
 Contoh lengkap: `backend/.env.example`, `deploy/.env.example`.
 
-Setelah `migrate up` (sekarang sampai **00012**), aktifkan fitur QR: `INSERT INTO feature_flags(key,enabled) VALUES ('qr',true) ON CONFLICT (key) DO UPDATE SET enabled=true;`
+Setelah `migrate up` (sekarang sampai **00013**), aktifkan fitur QR: `INSERT INTO feature_flags(key,enabled) VALUES ('qr',true) ON CONFLICT (key) DO UPDATE SET enabled=true;`
 (atau lewat Admin).
 
 > ⚠️ `GRAPH_API_VERSION=v23.0` di dev **tebakan**, belum dicek ke dokumentasi Meta. Cek versi yang masih didukung sebelum produksi.
 
-Akun dev (database lokal saja, jangan dipakai di produksi): customer `test@test.com` / `123123`, admin `admin` / `admin`.
+Akun dev (database lokal saja, jangan dipakai di produksi): customer `test` / `123123` (hasil backfill dari `test@test.com` setelah migrasi 00013), admin `admin` / `admin`.
 
 ---
 
@@ -52,31 +52,32 @@ Akun dev (database lokal saja, jangan dipakai di produksi): customer `test@test.
 
 ## 2. Yang BELUM dikerjakan (urut prioritas)
 
-### 2.1 Login/register customer disederhanakan: username + password saja ⬜
-Permintaan Jordi: pembuatan akun **simple**, hanya username dan password, supaya tabel DB juga sederhana. **Tanpa email sama sekali** (tanpa verifikasi, tanpa lupa password via email, tanpa SMTP).
+### 2.1 Login customer: username + password; daftar wajib nama, email, telepon ✅ (kode selesai, teruji API; belum diklik di browser)
+Selesai 5 Nov 2026 (sesi lanjutan). **Keputusan akhir Jordi:** pendaftaran WAJIB nama, username, email, nomor telepon, dan password. Email hanya data kontak (unik, tanpa verifikasi, tanpa kirim email, tanpa SMTP).
+- Migrasi **00013**: tambah `users.username` (citext, unik di antara akun belum dihapus, `^[a-z0-9][a-z0-9._-]{2,29}$`), backfill dari email lama; **kolom `email` dipertahankan** (data lama aman); `email_verified_at` dan tabel `email_verifications`/`password_resets` dibuang. Ada Down.
+- Register `{name, username, email, phone, password}` (409 `username_taken` / `email_taken`, telepon dinormalisasi 62...). Login `{username, password}`. Respons user: `{id, username, email, name}`.
+- Dihapus: endpoint forgot/reset/verify/resend, paket `internal/mail`, konfigurasi SMTP, email di job pengingat (tetap notifikasi dalam aplikasi).
+- Admin: cari customer lewat username/email, CSV memuat username/email/telepon; **"Reset password"** di detail customer (superadmin): `POST /customers/{id}/reset-password` membuat password sementara tampil sekali, mencabut semua sesi, audit log `customer.password_reset`. Kartu "Email" di Integrasi admin dihapus.
+- `deleteAccount` menganonimkan username dan email (bisa didaftarkan lagi).
+- Frontend: form daftar 5 isian, login username, profil (username dan email read-only), `auth.js`, `main.jsx`, `links.js`, `App.jsx`.
+- Bukti: migrasi up→down→up + backfill (email lama tetap), uji alur di Postgres sementara (daftar+validasi wajib, email dobel, login, reset admin, 403 admin biasa, hapus akun). Satu uji gagal sebelumnya hanya karena rate limit register 5/menit/IP di skrip uji.
+- Catatan: `ProfilePage` mengirim password baru hanya sebagai penanda `passwordUpdatedAt`; panggilan `POST /me/password` dari UI **belum tersambung** (sudah begitu sebelumnya). Email belum bisa diubah dari Profil.
 
-Yang perlu dikerjakan:
-- Migrasi: `users.username citext` unik (di antara user yang belum dihapus), backfill dari email lama, `users.email` jadi nullable (atau dihapus bila aman).
-- Aturan username: `^[a-z0-9][a-z0-9._-]{2,29}$`, password min. 8 karakter. Nama tampilan default = username.
-- Register/login memakai username. Hapus endpoint `forgot-password`, `reset-password`, `verify-email`, `resend-verification`, fungsi `sendVerification`, paket `internal/mail`, konfigurasi SMTP (config, compose, `.env.example`, docs), dan pengiriman email di `jobs` (pengingat tetap lewat notifikasi dalam aplikasi).
-- Frontend: `src/services/auth.js`, `LoginPage.jsx` (hapus mode forgot/reset), `ProfilePage`, `links.js` dan `main.jsx` (hapus penanganan tautan verify/reset), profil menampilkan username.
-- Admin: daftar/cari/CSV customer memakai username, respons support-login memakai username. Tambah **"reset password customer"** di admin (khusus superadmin: buat password sementara yang tampil sekali, cabut semua sesi, catat di audit log) karena tidak ada lagi reset lewat email.
-- `deleteAccount` (anonimisasi) harus ikut menganonimkan username.
-- Perbarui semua tes dan dokumentasi.
-
-### 2.2 Laporan harian + filter dashboard (meniru PixelAD) ⬜
-Referensi: dua screenshot PixelAD dari Jordi (Dashboard dan "Laporan Harian").
-- **Laporan:** tabel per tanggal (percakapan/klik WA, purchase, revenue) untuk satu bulan, baris TOTAL, ekspor CSV, pemilih bulan. Ditambah rincian **jumlah per event** (Contact/Lead/Purchase/dst: berapa terkirim, gagal, total nilai). Saat ini Laporan hanya 4 KPI + 3 iklan teratas + CSV.
-- **Dashboard:** kartu **Percakapan** dan **Revenue**, filter tanggal (sudah ada), tambah filter **sumber** (QR/WABA/API/manual) dan **status lead**, tren harian, distribusi event.
-- Datanya sudah ada di tabel `events`, `leads`, `daily_stats`. Perlu endpoint agregat per hari/per event.
+### 2.2 Laporan harian + filter dashboard (meniru PixelAD) ✅ (API teruji; UI belum diklik di browser)
+Selesai 5 Nov 2026.
+- Endpoint baru `GET /api/v1/reports/daily?month=YYYY-MM` atau `?from=&to=`, opsional `&source=` (nilai `leads.source` yang ada di workspace, daftar dikembalikan di `sources`) dan `&status=new|lead|checkout|purchase|lost`. Mengembalikan `days[]` (percakapan, dari iklan, purchase, revenue, event terkirim/gagal), `total`, `by_event[]` (total/terkirim/gagal/lainnya/nilai). File: `backend/internal/server/reports.go`.
+- Definisi: percakapan = lead baru per hari (`first_message_at`); purchase & revenue = event `Purchase` berstatus `sent`; event tes koneksi tidak dihitung; filter source/status berlaku lewat lead (event tanpa lead hanya muncul bila tanpa filter).
+- UI: `src/ReportViews.jsx`. **Laporan** (mode backend) diganti: pemilih bulan, tabel per tanggal + baris TOTAL, rincian per event, ekspor CSV. **Dashboard**: kartu Percakapan/Purchase/Revenue mengikuti filter tanggal yang sudah ada, filter sumber + status lead, grafik percakapan per hari, distribusi event. Tersambung lewat `laporanNode` dan `dashExtraNode` di `Template.jsx`/`App.jsx`.
+- Yang HILANG di Laporan mode backend dibanding mock lama: kartu "Kirim otomatis" (jadwal email/WhatsApp, memang mock), 3 iklan terbaik, dan PDF. Mode demo (tanpa backend) tetap memakai tampilan lama.
+- Bukti: uji data seed di Postgres sementara (per hari, total, event gagal tidak dihitung purchase, event tes dikecualikan, filter source/status, validasi 422, 401). SSR smoke test komponen lulus.
 
 ### 2.3 Hal lain yang belum
 - ⬜ Commit ke branch baru, dipecah per fitur (lihat bagian 7).
 - ⬜ Skrip e2e saat ini **hanya di folder scratchpad Claude, bukan di repo**. Pindahkan menjadi tes di repo (Python atau Go integration test). Daftar skrip: `e2e.py`, `e2e_admin.py`, `e2e_upload.py`, `e2e_functions.py`, `e2e_support.py`, `e2e_ads.py`, `e2e_qr.py`, `e2e_qr_gate.py`, `e2e_msgs.py`, `ssr_*.jsx`. Tanya pemilik sesi bila perlu.
-- ⬜ Perbarui `backend/API.md` dan `backend/SCHEMA.md`: endpoint baru (`/performance`, `/connections/ads*`, `/connections/whatsapp/*` dengan `qr_image`), field lead baru (`phone`, `last_message`, `messages`, `ad_name`), tabel baru (`ad_connections`, `ad_insights_daily`, `lead_messages`, kolom `wa_sessions.device_jid`).
+- 🟡 `backend/API.md`/`SCHEMA.md` sudah diperbarui untuk username dan `/reports/daily`; sisanya masih perlu ditambah: endpoint baru (`/performance`, `/connections/ads*`, `/connections/whatsapp/*` dengan `qr_image`), field lead baru (`phone`, `last_message`, `messages`, `ad_name`), tabel baru (`ad_connections`, `ad_insights_daily`, `lead_messages`, kolom `wa_sessions.device_jid`).
 - ⬜ Halaman mock yang belum nyata: Integrasi, Developer, Agency, sebagian Pengaturan.
 - ⬜ Kebijakan Privasi dan Syarat (isi pesan disimpan 90 hari, nomor tampil penuh ke pelanggan, mode QR memakai protokol tidak resmi).
-- ⬜ Verifikasi Docker build, restore backup, domain/DNS/TLS, SPF/DKIM (hilang bila email dibuang).
+- ⬜ Verifikasi Docker build, restore backup, domain/DNS/TLS, SPF/DKIM tidak lagi diperlukan (email dibuang).
 - ⬜ Membersihkan kode mati "anggota tim per workspace" di `src/Logic.js` (`members`, `invite`, `perms`). Fitur ini **diputuskan dihapus** (keep simple seperti PixelAD).
 
 ### 2.4 Diputuskan TIDAK dikerjakan
@@ -163,7 +164,7 @@ Tidak ada commit. `admin/src/data.js` dan `admin/src/store.js` sudah dihapus (st
 
 ## 8. Checklist sebelum dipasang di VPS
 
-- [ ] Selesaikan 2.1 (akun username + password) dan buang SMTP.
+- [x] Akun username + password dan SMTP dibuang (2.1). Pastikan `APP_URL` terisi (dipakai tautan dukungan admin).
 - [ ] `docker compose build` benar-benar berhasil, termasuk `waqr` (build `CGO_ENABLED=0`).
 - [ ] Isi `deploy/.env`: `POSTGRES_PASSWORD`, `ENCRYPTION_KEY`, `GRAPH_API_VERSION` (versi yang valid), `QR_SERVICE_TOKEN`, domain.
 - [ ] Aktifkan feature flag `qr` di admin.

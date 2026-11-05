@@ -13,7 +13,6 @@ import (
 	"github.com/dicodingin-aja/convera/backend/internal/config"
 	"github.com/dicodingin-aja/convera/backend/internal/dispatch"
 	"github.com/dicodingin-aja/convera/backend/internal/jobs"
-	"github.com/dicodingin-aja/convera/backend/internal/mail"
 	"github.com/dicodingin-aja/convera/backend/internal/meta"
 	"github.com/dicodingin-aja/convera/backend/internal/secure"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -42,9 +41,8 @@ func main() {
 	d := &dispatch.Dispatcher{DB: pool, Box: box, Meta: &meta.Client{BaseURL: cfg.GraphBaseURL, Version: cfg.GraphAPIVersion}}
 	log.Printf("worker berjalan (Graph API %s)", cfg.GraphAPIVersion)
 	go dispatch.RunExpiry(ctx, pool, 5*time.Minute)
-	mailer := mail.New(mail.Config{Host: cfg.SMTPHost, Port: cfg.SMTPPort, User: cfg.SMTPUser, Pass: cfg.SMTPPass, From: cfg.MailFrom})
 	syncer := &ads.Syncer{DB: pool, Box: box, Client: &ads.Client{BaseURL: cfg.GraphBaseURL, Version: cfg.GraphAPIVersion}}
-	go jobs.Run(ctx, pool, mailer, cfg.AppURL, syncer.SyncAll) // rekap harian, pengingat, retensi, sinkronisasi Meta Ads
+	go jobs.Run(ctx, pool, syncer.SyncAll) // rekap harian, pengingat, retensi, sinkronisasi Meta Ads
 	d.Run(ctx, 3*time.Second)
 	log.Print("worker berhenti")
 }

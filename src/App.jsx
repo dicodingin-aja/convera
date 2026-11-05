@@ -4,11 +4,12 @@ import Template from './Template.jsx';
 import defaults from './defaults.json';
 import { load, save, reset } from './services/storage.js';
 import ProfilePage from './ProfilePage.jsx';
+import { LaporanPage, DashboardExtras } from './ReportViews.jsx';
 import PlansModal from './PlansModal.jsx';
 import { updateProfile, ensureWorkspace, getSubscription, listWorkspaces } from './services/backend.js';
-import CreateWorkspace from './CreateWorkspace.jsx';
+import AddWorkspaceCard from './CreateWorkspace.jsx';
 import QrScanPage from './QrScanPage.jsx';
-import { fetchLive, emptyLive, liveApi } from './services/live.js';
+import { fetchLive, emptyLive, liveApi, rangeFor } from './services/live.js';
 import { appConfig } from './services/config.js';
 import PaymentModal from './PaymentModal.jsx';
 import LoginPage from './LoginPage.jsx';
@@ -29,7 +30,7 @@ export default class App extends React.Component {
     if (['integrasi', 'developer', 'performa'].includes(saved.page)) saved.page = 'overview';
     this.logic.state = { ...this.logic.state, ...saved };
     // route: null = dashboard, 'profile' = halaman Profil Saya. plansFor = indeks workspace yang sedang memilih paket.
-    this.state = { v: 0, route: null, plansFor: null, session: getSession(), realSub: null, workspaces: null, live: null };
+    this.state = { v: 0, route: null, plansFor: null, session: getSession(), realSub: null, workspaces: null, live: null, createWsOpen: false };
     window.convera = { reset, state: () => this.logic.state };
   }
   __setLogicState(update, cb) {
@@ -69,7 +70,7 @@ export default class App extends React.Component {
   };
   handleLogin = (session) => {
     const p = this.logic.state.profile || {};
-    const profile = p.email === session.email ? p : { ...p, name: session.name, email: session.email };
+    const profile = p.username === session.username ? p : { ...p, name: session.name, username: session.username, email: session.email };
     this.logic.state = { ...this.logic.state, profile, menu: null };
     save(this.logic.state);
     this.setState({ session, workspaces: null });
@@ -100,6 +101,14 @@ export default class App extends React.Component {
       this.setState({ workspaces: list });
     } catch { this.setState({ workspaces: [] }); }
   };
+  // Setelah workspace baru dibuat dari dialog: muat ulang daftar, pindah ke workspace itu, kosongkan data lama.
+  handleWorkspaceCreated = async () => {
+    await this.loadWorkspaces();
+    const n = (this.state.workspaces || []).length;
+    this.__setLogicState({ ws: Math.max(0, n - 1), page: 'overview', menu: null });
+    this._liveKey = null;
+    this.setState({ createWsOpen: false, live: null, realSub: null, route: null });
+  };
   saveProfile = async (profile) => {
     const savedProfile = await updateProfile(profile);
     this.__setLogicState({ profile: savedProfile });
@@ -107,7 +116,7 @@ export default class App extends React.Component {
   // Mode backend: status langganan workspace aktif diambil dari server (bukan data contoh).
   loadRealSub = async () => {
     const name = this._activeWsName;
-    if (!appConfig.backendEnabled || !this.state.session || !name) return;
+    if (!appConfig.backendEnabled || !this.state.session || !name || this._noWs) return;
     try {
       const slug = this._activeWsSlug || (await ensureWorkspace(name));
       const sub = await getSubscription(slug);
@@ -194,16 +203,16 @@ export default class App extends React.Component {
     if (!this.state.session) return <LoginPage themeStyle={vals.rootStyle} onLogin={this.handleLogin} />;
     if (appConfig.backendEnabled) {
       if (this.state.workspaces === null) return <div style={{ ...vals.rootStyle, minHeight: '100vh', padding: 40, background: 'var(--bg)', color: 'var(--muted)' }}>Memuat workspace…</div>;
-      if (this.state.workspaces.length === 0) return <CreateWorkspace themeStyle={vals.rootStyle} userName={this.state.session.name} onCreated={() => this.loadWorkspaces()} onLogout={this.handleLogout} />;
     }
     const st = this.logic.state;
     const me = st.profile || {};
     vals.userName = me.name || this.state.session.name;
-    vals.userEmail = me.email || this.state.session.email;
+    vals.userHandle = me.username || this.state.session.username;
     vals.userInitials = initials(vals.userName);
     // langganan workspace yang sedang dibuka (pengganti kotak kuota event di sidebar)
     const activeWs = vals.wsAll[st.ws] || vals.wsAll[0];
     const activeInfo = subInfo(getSub(st.subs, st.ws));
+    this._noWs = appConfig.backendEnabled && (this.state.workspaces || []).length === 0;
     this._activeWsName = activeWs.name;
     this._activeWsSlug = activeWs.slug;
     vals.subName = activeWs.name;
@@ -220,6 +229,22 @@ export default class App extends React.Component {
     // halaman Koneksi: setting per workspace (key = reset form saat pindah workspace)
     vals.koneksiNode = <KoneksiSettings key={st.ws} workspace={activeWs} value={(st.conn || {})[st.ws] || CONN_DEFAULT}
       onSave={(data) => this.__setLogicState({ conn: { ...(this.logic.state.conn || {}), [st.ws]: data } })} onScanQr={() => this.setState({ route: 'scan-qr' })} />;
+    if (appConfig.backendEnabled) {
+      vals.laporanNode = <LaporanPage key={'lap' + activeWs.slug} slug={activeWs.slug} workspaceName={activeWs.name} />;
+      vals.dashExtraNode = <DashboardExtras key={'dash' + activeWs.slug} slug={activeWs.slug} range={rangeFor(this.rangeIdx())} />;
+    }
+    if (appConfig.backendEnabled) {
+      // "Tambah workspace" (pilihan workspace / tombol kosong) membuka kartu isian nama di atas Dashboard, seperti PixelAD.
+      vals.newWs = () => { this.__setLogicState({ menu: null, page: 'overview' }); this.setState({ route: null, createWsOpen: true }); };
+      if (this._noWs) {
+        // Akun baru tanpa workspace: langsung di Dashboard, isi nama untuk membuat workspace pertama (bukan layar penuh).
+        vals.pg = Object.fromEntries(Object.keys(vals.pg || {}).map((k) => [k, false]));
+        vals.laporanNode = null; vals.dashExtraNode = null;
+      }
+      if (this._noWs || this.state.createWsOpen) {
+        vals.noWsNode = <AddWorkspaceCard first={this._noWs} userName={this.state.session.name} onCancel={() => this.setState({ createWsOpen: false })} onCreated={this.handleWorkspaceCreated} />;
+      }
+    }
     const { plansFor } = this.state;
     const modal = plansFor !== null && appConfig.backendEnabled ? (
       <PaymentModal themeStyle={vals.rootStyle} workspace={vals.wsAll[plansFor]} onClose={() => this.setState({ plansFor: null })} onDone={this.loadRealSub} />
@@ -246,7 +271,7 @@ export default class App extends React.Component {
       return (
         <div className="sc-host" style={support ? { paddingTop: 44 } : undefined}>
           {banner}
-          <ProfilePage themeStyle={vals.rootStyle} profile={me} onSave={this.saveProfile} workspaces={vals.wsAll} activeIndex={st.ws} subs={st.subs}
+          <ProfilePage themeStyle={vals.rootStyle} profile={me} onSave={this.saveProfile} workspaces={this._noWs ? [] : vals.wsAll} activeIndex={st.ws} subs={st.subs}
             onOpen={this.openWorkspace} onPlans={this.openPlans} onBack={() => this.setState({ route: null })} onLogout={this.handleLogout} />
           {modal}
         </div>

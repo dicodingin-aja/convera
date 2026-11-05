@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dicodingin-aja/convera/backend/internal/mail"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -64,10 +63,10 @@ LEFT JOIN s ON s.workspace_id = k.workspace_id AND s.day = k.day`, daysBack, wor
 // ---------- Pengingat ----------
 
 type reminder struct {
-	WorkspaceID, Workspace, Email, Owner string
-	Prefix                               string // sub | trial | token
-	Ref                                  time.Time
-	Days                                 int
+	WorkspaceID, Workspace, Owner string
+	Prefix                        string // sub | trial | token
+	Ref                           time.Time
+	Days                          int
 }
 
 // bucket menentukan tahap pengingat: H-1, H-3, atau H-7 (token: H-1 dan H-7). Hanya tahap yang berlaku SAAT INI
@@ -86,23 +85,23 @@ func oneLine(s string) string {
 	return strings.NewReplacer("\r", " ", "\n", " ", "\x00", "").Replace(s)
 }
 
-// SendReminders mengirim pengingat (notifikasi lonceng + email) dan menandai token yang sudah kedaluwarsa.
+// SendReminders mengirim pengingat (notifikasi dalam aplikasi) dan menandai token yang sudah kedaluwarsa.
 // Mengembalikan jumlah pengingat baru.
-func SendReminders(ctx context.Context, db *pgxpool.Pool, m mail.Sender, appURL string) (int, error) {
+func SendReminders(ctx context.Context, db *pgxpool.Pool) (int, error) {
 	rows, err := db.Query(ctx, `
-SELECT w.id::text, w.name, u.email::text, u.name, 'sub', sub.current_period_end,
+SELECT w.id::text, w.name, u.name, 'sub', sub.current_period_end,
        ceil(extract(epoch FROM (sub.current_period_end - now())) / 86400)::int
 FROM subscriptions sub JOIN workspaces w ON w.id = sub.workspace_id JOIN users u ON u.id = w.owner_user_id
 WHERE w.deleted_at IS NULL AND u.deleted_at IS NULL AND sub.status = 'active'
   AND sub.current_period_end > now() AND sub.current_period_end <= now() + interval '7 days'
 UNION ALL
-SELECT w.id::text, w.name, u.email::text, u.name, 'trial', sub.trial_until,
+SELECT w.id::text, w.name, u.name, 'trial', sub.trial_until,
        ceil(extract(epoch FROM (sub.trial_until - now())) / 86400)::int
 FROM subscriptions sub JOIN workspaces w ON w.id = sub.workspace_id JOIN users u ON u.id = w.owner_user_id
 WHERE w.deleted_at IS NULL AND u.deleted_at IS NULL AND sub.status = 'trial'
   AND sub.trial_until > now() AND sub.trial_until <= now() + interval '7 days'
 UNION ALL
-SELECT w.id::text, w.name, u.email::text, u.name, 'token', mc.token_expires_at,
+SELECT w.id::text, w.name, u.name, 'token', mc.token_expires_at,
        ceil(extract(epoch FROM (mc.token_expires_at - now())) / 86400)::int
 FROM meta_connections mc JOIN workspaces w ON w.id = mc.workspace_id JOIN users u ON u.id = w.owner_user_id
 WHERE w.deleted_at IS NULL AND u.deleted_at IS NULL AND mc.access_token_enc IS NOT NULL
@@ -113,7 +112,7 @@ WHERE w.deleted_at IS NULL AND u.deleted_at IS NULL AND mc.access_token_enc IS N
 	var due []reminder
 	for rows.Next() {
 		var r reminder
-		if err := rows.Scan(&r.WorkspaceID, &r.Workspace, &r.Email, &r.Owner, &r.Prefix, &r.Ref, &r.Days); err != nil {
+		if err := rows.Scan(&r.WorkspaceID, &r.Workspace, &r.Owner, &r.Prefix, &r.Ref, &r.Days); err != nil {
 			rows.Close()
 			return 0, err
 		}
@@ -138,18 +137,17 @@ WHERE w.deleted_at IS NULL AND u.deleted_at IS NULL AND mc.access_token_enc IS N
 		if tag.RowsAffected() == 0 {
 			continue // sudah pernah dikirim untuk tanggal berakhir ini
 		}
-		title, body, link := reminderText(r, appURL)
+		title, body, link := reminderText(r)
 		if _, err := db.Exec(ctx, `INSERT INTO notifications (user_id, workspace_id, type, title, body, link)
 			SELECT owner_user_id, id, $2, $3, $4, $5 FROM workspaces WHERE id = $1::uuid`, r.WorkspaceID, kind, title, body, link); err != nil {
 			return sent, err
 		}
-		mail.SendAsync(m, r.Email, oneLine(title), "Halo "+oneLine(r.Owner)+",\n\n"+body+"\n\n"+appURL+link+"\n\nSalam,\nTim Convera")
 		sent++
 	}
 
 	// Token yang sudah lewat tanggal berlaku: tandai kedaluwarsa dan beri tahu sekali.
 	exp, err := db.Query(ctx, `
-SELECT w.id::text, w.name, u.email::text, u.name, mc.token_expires_at
+SELECT w.id::text, w.name, u.name, mc.token_expires_at
 FROM meta_connections mc JOIN workspaces w ON w.id = mc.workspace_id JOIN users u ON u.id = w.owner_user_id
 WHERE w.deleted_at IS NULL AND u.deleted_at IS NULL AND mc.access_token_enc IS NOT NULL
   AND mc.token_expires_at IS NOT NULL AND mc.token_expires_at <= now()`)
@@ -159,7 +157,7 @@ WHERE w.deleted_at IS NULL AND u.deleted_at IS NULL AND mc.access_token_enc IS N
 	var gone []reminder
 	for exp.Next() {
 		var r reminder
-		if err := exp.Scan(&r.WorkspaceID, &r.Workspace, &r.Email, &r.Owner, &r.Ref); err != nil {
+		if err := exp.Scan(&r.WorkspaceID, &r.Workspace, &r.Owner, &r.Ref); err != nil {
 			exp.Close()
 			return sent, err
 		}
@@ -183,13 +181,12 @@ WHERE w.deleted_at IS NULL AND u.deleted_at IS NULL AND mc.access_token_enc IS N
 			SELECT owner_user_id, id, 'token_expired', $2, $3, $4 FROM workspaces WHERE id = $1::uuid`, r.WorkspaceID, title, body, link); err != nil {
 			return sent, err
 		}
-		mail.SendAsync(m, r.Email, title, "Halo "+oneLine(r.Owner)+",\n\n"+body+"\n\n"+appURL+link+"\n\nSalam,\nTim Convera")
 		sent++
 	}
 	return sent, nil
 }
 
-func reminderText(r reminder, appURL string) (title, body, link string) {
+func reminderText(r reminder) (title, body, link string) {
 	left := fmt.Sprintf("%d hari lagi", r.Days)
 	if r.Days <= 1 {
 		left = "besok atau kurang"
@@ -231,8 +228,6 @@ func Retention(ctx context.Context, db *pgxpool.Pool) (map[string]int64, error) 
 		{"lead_messages", `DELETE FROM lead_messages WHERE sent_at < now() - interval '90 days'`, nil},
 		{"webhook_inbox", `DELETE FROM webhook_inbox WHERE received_at < now() - make_interval(days => $1)`, []any{inboxDays}},
 		{"sessions", `DELETE FROM sessions WHERE expires_at < now() - interval '7 days' OR revoked_at < now() - interval '7 days'`, nil},
-		{"password_resets", `DELETE FROM password_resets WHERE expires_at < now() - interval '7 days'`, nil},
-		{"email_verifications", `DELETE FROM email_verifications WHERE expires_at < now() - interval '7 days'`, nil},
 		{"notifications", `DELETE FROM notifications WHERE read_at IS NOT NULL AND created_at < now() - interval '180 days'`, nil},
 		{"reminder_log", `DELETE FROM reminder_log WHERE sent_at < now() - interval '1 year'`, nil},
 		{"support_access_codes", `DELETE FROM support_access_codes WHERE expires_at < now() - interval '7 days'`, nil},
@@ -252,7 +247,7 @@ func Retention(ctx context.Context, db *pgxpool.Pool) (map[string]int64, error) 
 // Run menjalankan semua tugas: sekali saat mulai (dengan backfill rekap 35 hari), lalu berkala.
 // Berhenti saat ctx dibatalkan.
 // syncAds (boleh nil) dipanggil tiap 30 menit untuk menarik data iklan dari Meta.
-func Run(ctx context.Context, db *pgxpool.Pool, m mail.Sender, appURL string, syncAds func(context.Context)) {
+func Run(ctx context.Context, db *pgxpool.Pool, syncAds func(context.Context)) {
 	logErr := func(name string, err error) {
 		if err != nil && ctx.Err() == nil {
 			log.Printf("jobs/%s: %v", name, err)
@@ -260,7 +255,7 @@ func Run(ctx context.Context, db *pgxpool.Pool, m mail.Sender, appURL string, sy
 	}
 	stats := func(back int) { logErr("stats", RecomputeStats(ctx, db, back, "")) }
 	remind := func() {
-		n, err := SendReminders(ctx, db, m, appURL)
+		n, err := SendReminders(ctx, db)
 		logErr("reminders", err)
 		if n > 0 {
 			log.Printf("jobs/reminders: %d pengingat dikirim", n)

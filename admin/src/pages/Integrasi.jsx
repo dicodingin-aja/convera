@@ -8,7 +8,6 @@ const ITEMS = [
   ['meta', 'Meta Conversions API', 'Pengiriman event konversi ke Meta.', 'trend'],
   ['whatsapp', 'WhatsApp', 'Penerimaan chat customer lewat webhook.', 'chat'],
   ['notifyProof', 'Notifikasi bukti transfer', 'Kabar ke admin saat customer mengunggah bukti.', 'bell'],
-  ['email', 'Email', 'Email transaksional ke customer.', 'receipt'],
   ['storage', 'Penyimpanan file', 'Bukti transfer yang diunggah customer.', 'image'],
   ['sheets', 'Google Sheets', 'Ekspor rekap pembayaran otomatis.', 'dash'],
 ];
