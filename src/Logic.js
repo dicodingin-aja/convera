@@ -157,7 +157,7 @@ class Component extends DCLogic {
     const chatLine = path(cs, cMax);
     const xL = Array.from({ length: 6 }, (_, k) => { const i = Math.round(k / 5 * (n - 1)); return new Date(2026, 9, 17 - (n - 1 - i)).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }); });
     const topAds = allAds.slice().sort((x, y) => y.a[4] - x.a[4]).slice(0, 5).map(({ a, camp }) => ({ name: a[0], camp, ini: ini(a[0]), thumb: thumb(adIdx(a[0])), spend: rpS(a[1]), chat: fmt(a[2]), purch: fmt(a[4]), roas: roasT(a[5] / a[1]), rs: roasPill(a[5] / a[1]) }));
-    const health = [['Meta Dataset', metaOn ? 'Terhubung' : 'Terputus', metaOn ? 'ok' : 'err'], ['WhatsApp ' + ownerPhoneMasked, waOn ? 'Terhubung' : 'Terputus', waOn ? 'ok' : 'err'], ['Event gagal 24 jam', '3 event', 'warn'], ['Masa berlaku token Meta', tokenDays + ' hari lagi', tokenDays < 14 ? 'warn' : 'ok']]
+    const health = [['Meta Dataset', metaOn ? 'Terhubung' : 'Terputus', metaOn ? 'ok' : 'err'], ['WhatsApp ' + waPhoneMasked, waOn ? 'Terhubung' : 'Terputus', waOn ? 'ok' : 'err'], ['Event gagal 24 jam', '3 event', 'warn'], ['Masa berlaku token Meta', tokenDays + ' hari lagi', tokenDays < 14 ? 'warn' : 'ok']]
       .map(([label, value, k]) => ({ label, value, dot: { width: 8, height: 8, borderRadius: '50%', flex: 'none', background: dotC(k) }, vs: { fontSize: 13, fontWeight: 500, color: k === 'ok' ? 'var(--text)' : 'var(--accentText)' } }));
     const steps = [['Buat workspace', 'Laundry Kilat Bersih · Jasa · Depok', true], ['Hubungkan Meta Dataset', 'Dataset & access token untuk Conversions API', true], ['Hubungkan WhatsApp', 'Agar chat dari iklan tercatat sebagai Lead', false, 'Hubungkan', 'koneksi'], ['Pilih cara kirim konversi', 'API, tandai manual, atau aturan otomatis', false, 'Atur', 'aturan'], ['Kirim event percobaan', 'Pastikan event muncul di Meta Test Events', false, 'Kirim tes', 'developer']]
       .map(([title, desc, done, cta, pg]) => ({ title, desc, todo: !done, cta, go: goP(pg), mark: done ? ic.check : '', ts: { fontSize: 14, fontWeight: 500, color: done ? 'var(--muted)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none' }, dot: { width: 26, height: 26, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: done ? 'var(--accent)' : 'var(--neutral)', color: '#fff' } }));
@@ -409,7 +409,7 @@ class Component extends DCLogic {
         { icon: ic.meta, title: 'Meta Dataset', sub: 'Kopi Senja – WhatsApp · 1029384756102938', status: metaOn ? 'Terhubung' : 'Terputus', pill: stP(metaOn), emq: metaOn, alert: metaOn ? '' : 'Event baru tidak dikirim ke Meta sampai Dataset dihubungkan lagi.',
           rows: metaOn ? [kRow('Event diterima 7 hari', '1.204'), kRow('Masa berlaku token', tokenDays + ' hari lagi', tokenDays < 14), kRow('Test event code', 'TEST48213')] : [kRow('Terakhir aktif', '17 Okt, 14:40')],
           actions: metaOn ? [A('Ganti token', () => set({ tokModal: true, tokVal: '' }), 'p'), A('Tes koneksi', async () => { say('Menguji koneksi Meta…'); const r = await testConnection({ datasetId: s.f.dataset, token: s.f.token }); say(r.ok ? 'Koneksi Meta OK' : 'Meta menolak koneksi', r.ok ? (r.demo ? 'Mode demo · Dataset ID & token valid' : r.name) : r.error); }), A('Putuskan', () => cfOpen('meta'), 'd')] : [A('Hubungkan', () => { set({ disc: { ...disc, meta: false } }); say('Meta Dataset terhubung'); }, 'p')] },
-        { icon: ic.chat, title: 'WhatsApp', sub: ownerPhoneMasked + ' · Cloud API', status: waOn ? 'Terhubung' : 'Terputus', pill: stP(waOn), emq: false, alert: waOn ? '' : 'Terputus sejak 12:31. 12 event ditahan dan akan dikirim otomatis setelah terhubung. Biasanya karena token System User dicabut.',
+        { icon: ic.chat, title: 'WhatsApp', sub: waPhoneMasked + ' · Cloud API', status: waOn ? 'Terhubung' : 'Terputus', pill: stP(waOn), emq: false, alert: waOn ? '' : 'Terputus sejak 12:31. 12 event ditahan dan akan dikirim otomatis setelah terhubung. Biasanya karena token System User dicabut.',
           rows: [kRow('Mode', 'Cloud API (resmi)'), kRow('Terakhir aktif', waOn ? 'Baru saja' : '17 Okt, 12:31', !waOn), kRow('Lead hari ini', '37'), kRow('Webhook ctwa_clid', waOn ? 'Aktif' : 'Tertunda', !waOn)],
           actions: waOn ? [A('Tambah nomor', () => set({ screen: 'onboarding', step: 2 })), A('Putuskan', () => cfOpen('wa'), 'd')] : [A('Hubungkan ulang', () => { set({ waOn: true, disc: { ...disc, wa: false }, banners: { ...s.banners, wa: false } }); say('WhatsApp terhubung lagi', '12 event tertahan sedang dikirim'); }, 'p'), A('Putuskan', () => cfOpen('wa'), 'd')] },
         { icon: ic.bars, title: 'Ad Account', sub: adOn ? 'act_2049381726 · Kopi Senja Ads' : 'Belum terhubung', status: adOn ? 'Terhubung' : 'Belum terhubung', pill: adOn ? stP(true) : pill('neutral'), emq: false, alert: '',
@@ -552,12 +552,17 @@ class Component extends DCLogic {
     const W = s.width, mobile = W < 768, wide = W >= 1024;
     const ownerPhone = P.profilePhone ? normPhone(P.profilePhone) : '';
     const ownerPhoneMasked = ownerPhone ? ownerPhone.slice(0, 4) + '-•••-' + ownerPhone.slice(-4) : 'nomor belum diisi';
+    // Nomor WA yang terdaftar di koneksi (dari wa_sessions via health), fallback ke nomor pemilik akun
+    const liveHealth = P.live?.raw?.health || null;
+    const waPhoneMasked = liveHealth?.wa_phone_masked
+      ? liveHealth.wa_phone_masked.slice(0, 4) + '-•••-' + liveHealth.wa_phone_masked.slice(-4)
+      : ownerPhoneMasked;
     const metaConnected = !s.disc?.meta && !!s.f?.dataset && !!s.f?.token;
     const waConnected = !!s.waOn && !s.disc?.wa;
     const healthIssues = [metaConnected, waConnected].filter((connected) => !connected).length;
     const healthSummary = healthIssues ? healthIssues + ' koneksi bermasalah' : 'Semua koneksi sehat';
     const healthMetaStatus = metaConnected ? 'Terhubung · token berlaku ' + (s.tokenDays ?? 0) + ' hari lagi' : 'Terputus · hubungkan Meta Dataset';
-    const healthWaTitle = 'WhatsApp ' + ownerPhoneMasked;
+    const healthWaTitle = 'WhatsApp ' + waPhoneMasked;
     const healthWaStatus = waConnected ? 'Terhubung · Cloud API' : 'Terputus · Cloud API';
     const common = { rootStyle, ic, f: { ...s.f, ...(P.activeWorkspace ? { biz: P.activeWorkspace.name, industry: P.activeWorkspace.category || s.f.industry } : {}) }, toggleDark: () => this.setState({ dark: !dark, menu: null }), darkLabel: dark ? 'Mode terang' : 'Mode gelap', darkIcon: dark ? ic.sun : ic.moon, isOnboarding: screen === 'onboarding', isApp: screen === 'app' };
 
@@ -690,14 +695,14 @@ class Component extends DCLogic {
         const tn = /reject|invalid|fail|disconnect|expired/.test(ty) ? 'err' : /remind|expir|token|trial|soon/.test(ty) ? 'warn' : /approv|activ|paid|success|verified/.test(ty) ? 'ok' : 'info';
         return [tn, tn === 'err' ? 'alert' : tn === 'warn' ? 'clock' : tn === 'ok' ? 'bag' : 'users', n.body ? n.title + ' · ' + n.body : n.title, agoId(n.created_at), !n.read_at];
       })]
-      : [['err', 'alert', 'WhatsApp ' + ownerPhoneMasked + ' terputus. Event dari nomor ini ditahan.', '2 jam lalu'], ['warn', 'clock', 'Token Meta kedaluwarsa dalam 5 hari.', '5 jam lalu'], ['ok', 'bag', '48 Purchase terkirim kemarin · Rp 21.300.000', 'Kemarin, 08.00'], ['info', 'users', 'Dina (CS) bergabung ke workspace Kopi Senja.', '2 hari lalu']];
+      : [['err', 'alert', 'WhatsApp ' + waPhoneMasked + ' terputus. Event dari nomor ini ditahan.', '2 jam lalu'], ['warn', 'clock', 'Token Meta kedaluwarsa dalam 5 hari.', '5 jam lalu'], ['ok', 'bag', '48 Purchase terkirim kemarin · Rp 21.300.000', 'Kemarin, 08.00'], ['info', 'users', 'Dina (CS) bergabung ke workspace Kopi Senja.', '2 hari lalu']];
     const isUnread = (k, flag) => (realNotifs ? !!flag : !s.read && k < 3);
     const tone = { err: ['var(--errBg)', 'var(--errFg)'], warn: ['var(--warnBg)', 'var(--warnFg)'], ok: ['var(--okBg)', 'var(--okFg)'], info: ['var(--neutral)', 'var(--text)'] };
     const notifs = NOT.map(([t, i, title, time, unreadFlag], k) => ({ title, time, icon: ic[i], unread: isUnread(k, unreadFlag),
       row: { display: 'flex', gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--border)', background: isUnread(k, unreadFlag) ? 'var(--surface2)' : 'transparent' },
       iconStyle: { width: 30, height: 30, flex: 'none', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tone[t][0], color: tone[t][1] } }));
     const BAN = [
-      ['wa', 'err', 'WhatsApp ' + ownerPhoneMasked + ' terputus.', 'Event dari nomor ini ditahan sampai terhubung lagi.', 'Hubungkan ulang', 'koneksi'],
+      ['wa', 'err', 'WhatsApp ' + waPhoneMasked + ' terputus.', 'Event dari nomor ini ditahan sampai terhubung lagi.', 'Hubungkan ulang', 'koneksi'],
       ['token', 'warn', 'Token Meta kedaluwarsa dalam 5 hari.', 'Event berhenti terkirim setelah 22 Okt.', 'Ganti token', 'koneksi'],
       ['trial', 'info', 'Trial Growth tersisa 9 hari.', 'Pilih paket agar fitur ROAS & Event tetap aktif.', 'Pilih paket', 'pengaturan'],
     ].filter(([k]) => s.banners[k]);

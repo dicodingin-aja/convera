@@ -160,7 +160,8 @@ SELECT mc.mode, mc.status AS meta_status, mc.last_check_at, mc.token_expires_at,
   (SELECT count(*) FROM events WHERE workspace_id = $1 AND status = 'queued') AS queued,
   (SELECT count(*) FROM events WHERE workspace_id = $1 AND status = 'pending_value') AS pending_value,
   (SELECT max(received_at) FROM webhook_inbox WHERE workspace_id = $1) AS last_message_at,
-  (SELECT status FROM wa_sessions WHERE workspace_id = $1) AS qr_status
+  (SELECT status FROM wa_sessions WHERE workspace_id = $1) AS qr_status,
+  (SELECT phone_masked FROM wa_sessions WHERE workspace_id = $1) AS wa_phone_masked
 FROM meta_connections mc WHERE mc.workspace_id = $1`, id)
 	if err != nil {
 		serverError(c, err)
