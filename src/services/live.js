@@ -35,19 +35,6 @@ export function customRange(from, to) {
   const f = from || ymdJkt(), t = to || ymdJkt();
   return { label: 'Kustom', from: f, to: t, days: diffDays(f, t) + 1, hint: short(f) + (f === t ? '' : '–' + short(t)) };
 }
-  const monthStart = today.slice(0, 8) + '01';
-  const prevMonthEnd = addDays(monthStart, -1);
-  const R = [
-    ['Hari ini', today, today],
-    ['Kemarin', addDays(today, -1), addDays(today, -1)],
-    ['7 hari terakhir', addDays(today, -6), today],
-    ['30 hari terakhir', addDays(today, -29), today],
-    ['Bulan ini', monthStart, today],
-    ['Bulan lalu', prevMonthEnd.slice(0, 8) + '01', prevMonthEnd],
-  ][idx] || ['7 hari terakhir', addDays(today, -6), today];
-  const [label, from, to] = R;
-  return { label, from, to, days: diffDays(from, to) + 1, hint: from === to ? short(from) : short(from) + '–' + short(to) };
-}
 
 // ---------- Pemetaan label ----------
 

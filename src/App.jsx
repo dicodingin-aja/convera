@@ -167,10 +167,11 @@ export default class App extends React.Component {
   // Memuat overview, leads, event, dan aturan untuk workspace aktif + rentang tanggal yang dipilih.
   refreshLive = async () => {
     const slug = this._activeWsSlug, range = this.rangeIdx();
+    const customFrom = this.logic.state.customFrom || '', customTo = this.logic.state.customTo || '';
     if (!appConfig.backendEnabled || !this.state.session || !slug) return;
     try {
-      const next = await fetchLive(slug, range);
-      if (slug !== this._activeWsSlug || range !== this.rangeIdx()) return; // sudah pindah workspace/rentang
+      const next = await fetchLive(slug, range, customFrom, customTo);
+      if (slug !== this._activeWsSlug || range !== this.rangeIdx() || customFrom !== (this.logic.state.customFrom || '') || customTo !== (this.logic.state.customTo || '')) return; // sudah pindah workspace/rentang
       this.setState({ live: next });
     } catch { /* pertahankan data sebelumnya; 401 ditangani oleh handleUnauthorized */ }
   };
@@ -232,7 +233,7 @@ export default class App extends React.Component {
   }
   componentDidUpdate() {
     if (appConfig.backendEnabled && this.state.session && this.state.workspaces && this._activeWsSlug) {
-      const key = this._activeWsSlug + '|' + this.rangeIdx();
+      const key = this._activeWsSlug + '|' + this.rangeIdx() + '|' + (this.logic.state.customFrom || '') + '|' + (this.logic.state.customTo || '');
       if (this._liveKey !== key) { this._liveKey = key; this.refreshLive(); }
       this.fetchOpenDetails();
     }

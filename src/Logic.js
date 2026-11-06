@@ -7,6 +7,16 @@ import { liveOverview, liveTimeline, liveEventDetail, liveReport, rangeFor, LIVE
 import { randomToken, uid } from './services/crypto.js';
 import { parseRecipients, checkPassword, isHttps, normPhone } from './services/validators.js';
 
+const displayPhone = (phone) => {
+  const raw = String(phone || '');
+  const digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('62') && !raw.includes('*')) {
+    const local = digits.slice(2);
+    return '+62 ' + local.slice(0, 3) + '-' + local.slice(3, 7) + '-' + local.slice(7);
+  }
+  return raw.replace('****', '•••');
+};
+
 class Component extends DCLogic {
   state = {
     dark: null, screen: null, step: 0, width: 1440,
@@ -94,6 +104,8 @@ class Component extends DCLogic {
     const ownerPhoneMasked = ownerPhone ? ownerPhone.slice(0, 4) + '-•••-' + ownerPhone.slice(-4) : 'nomor belum diisi';
     // Mode backend: P.live berisi data nyata dari API (leads, event, aturan, overview). Tanpa itu, data contoh dipakai.
     const LV = P.live || null;
+    const liveHealth = LV?.raw?.overview?.health || null;
+    const waPhoneMasked = displayPhone(liveHealth?.wa_phone || liveHealth?.wa_phone_masked) || ownerPhoneMasked;
     const sem = P.statusStyle === 'semantic';
     const fmt = (n) => Math.round(n).toLocaleString('id-ID');
     const rp = (n) => 'Rp ' + fmt(n);
@@ -553,10 +565,8 @@ class Component extends DCLogic {
     const ownerPhone = P.profilePhone ? normPhone(P.profilePhone) : '';
     const ownerPhoneMasked = ownerPhone ? ownerPhone.slice(0, 4) + '-•••-' + ownerPhone.slice(-4) : 'nomor belum diisi';
     // Nomor WA yang terdaftar di koneksi (dari wa_sessions via health), fallback ke nomor pemilik akun
-    const liveHealth = P.live?.raw?.health || null;
-    const waPhoneMasked = liveHealth?.wa_phone_masked
-      ? liveHealth.wa_phone_masked.slice(0, 4) + '-•••-' + liveHealth.wa_phone_masked.slice(-4)
-      : ownerPhoneMasked;
+    const liveHealth = P.live?.raw?.overview?.health || null;
+    const waPhoneMasked = displayPhone(liveHealth?.wa_phone || liveHealth?.wa_phone_masked) || ownerPhoneMasked;
     const metaConnected = !s.disc?.meta && !!s.f?.dataset && !!s.f?.token;
     const waConnected = !!s.waOn && !s.disc?.wa;
     const healthIssues = [metaConnected, waConnected].filter((connected) => !connected).length;
@@ -669,8 +679,20 @@ class Component extends DCLogic {
       pick: () => this.setState({ ws: w.i, menu: null, more: false, wsQuery: '' }),
       style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', background: w.i === s.ws ? 'var(--surface2)' : 'transparent' } }));
     const menu = (m) => () => this.setState({ menu: s.menu === m ? null : m });
-    const PRE = [0, 1, 2, 3, 4, 5].map((i) => { const r = rangeFor(i); return [r.label, r.hint]; });
-    const presets = PRE.map(([label, hint], i) => ({ label, hint, pick: () => this.setState({ range: i, menu: null }), style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: i === s.range ? 500 : 400, background: i === s.range ? 'var(--accentSoft)' : 'transparent', color: i === s.range ? 'var(--accentText)' : 'var(--text)' } }));
+    const customFrom = s.customFrom || '', customTo = s.customTo || '';
+    const setCustomDate = (key) => (e) => {
+      e.stopPropagation();
+      const value = e.target.value;
+      this.setState((st) => ({ [key]: value, range: key === 'customFrom' ? (value && st.customTo ? 6 : st.range) : (st.customFrom && value ? 6 : st.range) }));
+    };
+    const customLabel = React.createElement('span', { style: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1 } },
+      React.createElement('span', null, 'Pilih tanggal'),
+      React.createElement('span', { style: { display: 'flex', gap: 6 } },
+        React.createElement('input', { type: 'date', value: customFrom, onClick: (e) => e.stopPropagation(), onChange: setCustomDate('customFrom'), 'aria-label': 'Tanggal mulai', style: { minWidth: 0, width: '50%', height: 30, border: '1px solid var(--border)', borderRadius: 6, padding: '0 5px', background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'inherit', fontSize: 11 } }),
+        React.createElement('input', { type: 'date', value: customTo, onClick: (e) => e.stopPropagation(), onChange: setCustomDate('customTo'), 'aria-label': 'Tanggal akhir', style: { minWidth: 0, width: '50%', height: 30, border: '1px solid var(--border)', borderRadius: 6, padding: '0 5px', background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'inherit', fontSize: 11 } })),
+    );
+    const PRE = [0, 1, 2, 3, 4, 5].map((i) => { const r = rangeFor(i); return [r.label, r.hint]; }).concat([['Kustom', customFrom && customTo ? customFrom + ' – ' + customTo : 'Pilih rentang']]);
+    const presets = PRE.map(([label, hint], i) => ({ label: i === 6 ? customLabel : label, hint: i === 6 ? '' : hint, pick: () => { if (i < 6) this.setState({ range: i, menu: null }); }, style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 8, border: 'none', cursor: i === 6 ? 'default' : 'pointer', textAlign: 'left', fontSize: 13, fontWeight: i === s.range ? 500 : 400, background: i === s.range ? 'var(--accentSoft)' : 'transparent', color: i === s.range ? 'var(--accentText)' : 'var(--text)' } }));
     // Mode backend: notifikasi nyata dari API; mode demo tetap memakai data contoh.
     const agoId = (iso) => { const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 1 ? 'Baru saja' : m < 60 ? m + ' mnt lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
     const realNotifs = P.live ? ((P.notifs && P.notifs.items) || []) : null;
@@ -743,7 +765,7 @@ class Component extends DCLogic {
       openHelp: menu('help'), helpMenu: s.menu === 'help', openUser: menu('user'), userMenu: s.menu === 'user',
       goOnboarding: () => this.setState({ screen: 'onboarding', menu: null }),
       banners, moreBanners: BAN.length > 1 ? BAN.length - 1 : 0,
-      pageTitle: page[1], pageBadge: page[3], pageDesc: page[5], pagePhase: page[6],
+      pageTitle: page[1], pageBadge: 'v1.1', pageDesc: page[5], pagePhase: page[6],
       mainStyle: { padding: mobile ? '18px 16px 96px' : '24px 28px 48px', display: 'flex', flexDirection: 'column', gap: 18, width: '100%', maxWidth: 1440 },
       skel4: [1, 2, 3, 4], skelRows: [1, 2, 3, 4, 5].map((k) => ({ a: { width: 120 + ((k * 37) % 80), height: 12, borderRadius: 6, background: 'var(--neutral)' }, b: { width: 70 + ((k * 23) % 40), height: 12, borderRadius: 6, background: 'var(--neutral)' } })),
       bottomNav, moreOpen: s.more, openMore: () => this.setState({ more: true }), closeMore: () => this.setState({ more: false }), moreNav,

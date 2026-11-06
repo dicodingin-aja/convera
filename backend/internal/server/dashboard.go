@@ -161,7 +161,8 @@ SELECT mc.mode, mc.status AS meta_status, mc.last_check_at, mc.token_expires_at,
   (SELECT count(*) FROM events WHERE workspace_id = $1 AND status = 'pending_value') AS pending_value,
   (SELECT max(received_at) FROM webhook_inbox WHERE workspace_id = $1) AS last_message_at,
   (SELECT status FROM wa_sessions WHERE workspace_id = $1) AS qr_status,
-  (SELECT phone_masked FROM wa_sessions WHERE workspace_id = $1) AS wa_phone_masked
+	(SELECT phone_masked FROM wa_sessions WHERE workspace_id = $1) AS wa_phone_masked,
+	(SELECT phone_enc FROM wa_sessions WHERE workspace_id = $1) AS wa_phone_enc
 FROM meta_connections mc WHERE mc.workspace_id = $1`, id)
 	if err != nil {
 		serverError(c, err)
@@ -169,6 +170,12 @@ FROM meta_connections mc WHERE mc.workspace_id = $1`, id)
 	}
 	var h any
 	if len(health) > 0 {
+		if encrypted, ok := health[0]["wa_phone_enc"].([]byte); ok && s.Box != nil {
+			if phone, decryptErr := s.Box.OpenString(encrypted); decryptErr == nil {
+				health[0]["wa_phone"] = phone
+			}
+		}
+		delete(health[0], "wa_phone_enc")
 		h = health[0]
 	}
 	ok(c, gin.H{"kpi": k, "previous": prev[0], "ads": adsQ[0], "series": series, "funnel": funnel[0], "top_ads": top, "health": h,

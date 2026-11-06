@@ -452,16 +452,24 @@ func (s *Server) qrStatusUpdate(c *gin.Context) {
 		return
 	}
 	masked := ""
+	var phoneEnc []byte
 	if p, err := wa.NormalizePhone(in.Phone); err == nil {
 		masked = wa.MaskPhone(p)
+		if s.Box != nil {
+			phoneEnc, err = s.Box.SealString(p)
+			if err != nil {
+				serverError(c, err)
+				return
+			}
+		}
 	}
 	id := c.GetString("workspace_id")
 	var prev string
 	_ = s.DB.QueryRow(c, `SELECT status FROM wa_sessions WHERE workspace_id=$1`, id).Scan(&prev)
 	if _, err := s.DB.Exec(c, `
-INSERT INTO wa_sessions (workspace_id, status, phone_masked, last_seen_at) VALUES ($1,$2,NULLIF($3,''),now())
-ON CONFLICT (workspace_id) DO UPDATE SET status=$2, phone_masked=COALESCE(NULLIF($3,''), wa_sessions.phone_masked), last_seen_at=now()`,
-		id, in.Status, masked); err != nil {
+INSERT INTO wa_sessions (workspace_id, status, phone_masked, phone_enc, last_seen_at) VALUES ($1,$2,NULLIF($3,''),$4,now())
+ON CONFLICT (workspace_id) DO UPDATE SET status=$2, phone_masked=COALESCE(NULLIF($3,''), wa_sessions.phone_masked), phone_enc=COALESCE($4, wa_sessions.phone_enc), last_seen_at=now()`,
+		id, in.Status, masked, phoneEnc); err != nil {
 		serverError(c, err)
 		return
 	}
