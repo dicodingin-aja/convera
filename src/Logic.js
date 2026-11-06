@@ -395,7 +395,7 @@ class Component extends DCLogic {
       top: allAds.slice().sort((x, y) => y.a[5] / y.a[1] - x.a[5] / x.a[1]).slice(0, 3).map(({ a }, i) => ({ n: i + 1, name: a[0], purch: fmt(a[4] * lpk) + ' purchase', roas: roasT(a[5] / a[1]) })),
       pdf: () => { const ok = printReport({ title: WS[s.ws][0], range: lp.range, kpis: lp.kpis, top: lp.top, note: 'Laporan dibuat otomatis oleh Convera.' }); say(ok ? 'Laporan PDF disiapkan' : 'Pop-up diblokir', ok ? 'Pilih “Simpan sebagai PDF” di dialog cetak' : 'Izinkan pop-up untuk mengunduh PDF'); }, csv: () => csv('convera-laporan.csv', ['iklan', 'kampanye', 'spend', 'chat', 'lead', 'purchase', 'nilai'], allAds.map(({ a, camp }) => [a[0], camp, a[1], a[2], a[3], a[4], a[5]])),
       sw: sw(s.lpOn ?? true, () => set({ lpOn: !(s.lpOn ?? true) })), channels: [['email', 'Email'], ['wa', 'WhatsApp']].map(([k, label]) => ({ label, pick: () => set({ lpCh: { ...ch2, [k]: !ch2[k] } }), style: chip(ch2[k]) })),
-      to: s.lpTo ?? 'rizky@kopisenja.id, 0812-3456-7890', setTo: (e) => set({ lpTo: e.target.value }), day: s.lpDay || 'Senin', setDay: (e) => set({ lpDay: e.target.value }), hour: s.lpHour || '08.00 WIB', setHour: (e) => set({ lpHour: e.target.value }),
+      to: s.lpTo ?? [P.profileEmail, P.profilePhone].filter(Boolean).join(', '), setTo: (e) => set({ lpTo: e.target.value }), day: s.lpDay || 'Senin', setDay: (e) => set({ lpDay: e.target.value }), hour: s.lpHour || '08.00 WIB', setHour: (e) => set({ lpHour: e.target.value }),
       save: () => { const r = parseRecipients(s.lpTo ?? 'rizky@kopisenja.id, 0812-3456-7890'); if (!ch2.email && !ch2.wa) { say('Pilih minimal satu kanal'); return; } if (r.invalid.length) { say('Penerima tidak valid', r.invalid.join(', ')); return; } if (ch2.email && !r.emails.length) { say('Isi alamat email', 'Kanal Email butuh minimal satu email'); return; } if (ch2.wa && !r.phones.length) { say('Isi nomor WhatsApp', 'Kanal WhatsApp butuh minimal satu nomor'); return; } set({ lpSaved: { at: Date.now(), emails: r.emails, phones: r.phones } }); say('Jadwal laporan disimpan', 'Setiap ' + (s.lpDay || 'Senin') + ' ' + (s.lpHour || '08.00 WIB')); } };
 
     if (LV) Object.assign(lp, liveReport(LV, { rp, rpS, csv, tfmt }));
@@ -459,21 +459,40 @@ class Component extends DCLogic {
     // ---------- pengaturan ----------
     const tabK = ['umum', 'notif', 'keamanan'].includes(s.setTab) ? s.setTab : 'umum';
     const roleP = (r) => pill(r === 'Owner' ? 'ok' : r === 'Admin' ? 'accent' : r === 'CS' ? 'soft' : 'neutral');
-    const members = [['Rizky Saputra', 'rizky@kopisenja.id', 'Owner', 'Aktif'], ['Dina Maharani', 'dina@kopisenja.id', 'CS', 'Aktif · 5 mnt lalu'], ['Arif Rahman', 'arif@kopisenja.id', 'Admin', 'Aktif · kemarin'], ['Lumbung Digital (agency)', 'ads@lumbungdigital.id', 'Viewer', 'Undangan terkirim'], ...(s.invites || [])];
+    const ownerName = P.profileName || 'Pemilik akun';
+    const ownerEmail = P.profileEmail || 'Email belum diisi';
+    const members = P.backendEnabled
+      ? [[ownerName, ownerEmail, 'Owner', 'Aktif']]
+      : [[ownerName, ownerEmail, 'Owner', 'Aktif'], ['Dina Maharani', 'dina@kopisenja.id', 'CS', 'Aktif · 5 mnt lalu'], ['Arif Rahman', 'arif@kopisenja.id', 'Admin', 'Aktif · kemarin'], ...(s.invites || [])];
     const bill = s.bill || 'bulanan';
     const PLANS = [['Starter', 149000, '2.000 event / bulan', ['1 workspace & 1 nomor WhatsApp', 'Tandai manual & API', 'Log event 30 hari']], ['Growth', 399000, '10.000 event / bulan', ['3 workspace & 3 nomor WhatsApp', 'Aturan otomatis & ROAS', 'Laporan terjadwal', 'Log event 90 hari']], ['Agency', 1290000, '50.000 event / bulan', ['Workspace tak terbatas', 'Dashboard Semua Workspace', 'Laporan white-label', 'Prioritas support WhatsApp']]];
     const curPlan = s.plan || null;
     const priceOf = (p) => bill === 'tahunan' ? p * 10 : p;
     const NT = [['WhatsApp / Meta terputus', 'Segera, agar event tidak tertahan', 1, 1], ['Token Meta hampir kedaluwarsa', '14, 7, dan 1 hari sebelumnya', 1, 1], ['Event gagal > 10 dalam 1 jam', 'Ringkasan error & saran perbaikan', 1, 0], ['Kuota event 80% & 100%', 'Agar tidak ada konversi yang terlewat', 1, 1], ['Ringkasan harian', 'Chat, Purchase, dan nilai kemarin', 0, 1], ['Laporan mingguan', 'Setiap Senin pagi', 1, 0], ['Anggota tim baru', 'Saat undangan diterima', 1, 0]];
     const nts = s.nt || {};
-    const sess = [[ic.monitor, 'Chrome · Windows', 'Jakarta · 103.47.x.x · sekarang', true], [ic.phone, 'Safari · iPhone 15', 'Jakarta · 2 jam lalu', false], [ic.monitor, 'Edge · Windows', 'Bandung · 3 hari lalu', false]].filter((_, i) => !(s.sessOut || {})[i]);
+    const demoSessions = [[ic.monitor, 'Chrome · Windows', 'Jakarta · 103.47.x.x · sekarang', true], [ic.phone, 'Safari · iPhone 15', 'Jakarta · 2 jam lalu', false], [ic.monitor, 'Edge · Windows', 'Bandung · 3 hari lalu', false]];
+    const formatSession = (item) => {
+      const ua = item.user_agent || 'Perangkat tidak dikenal';
+      const mobileDevice = /android|iphone|ipad|mobile/i.test(ua);
+      const browser = /edg/i.test(ua) ? 'Edge' : /chrome/i.test(ua) ? 'Chrome' : /safari/i.test(ua) && !/chrome/i.test(ua) ? 'Safari' : 'Browser';
+      const os = /windows/i.test(ua) ? 'Windows' : /android/i.test(ua) ? 'Android' : /iphone|ipad/i.test(ua) ? 'iOS' : /mac/i.test(ua) ? 'macOS' : 'Perangkat';
+      const at = item.last_used_at || item.created_at;
+      const when = item.current ? 'sekarang' : at ? new Date(at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : 'belum digunakan';
+      return [mobileDevice ? ic.phone : ic.monitor, browser + ' · ' + os, (item.ip || 'IP tidak tersedia') + ' · ' + when, !!item.current, item.id];
+    };
+    const sess = P.backendEnabled ? (P.security?.sessions || []).map(formatSession) : demoSessions.filter((_, i) => !(s.sessOut || {})[i]);
+    const auditAction = (action) => ({ 'auth.login': 'Masuk ke akun', 'auth.logout': 'Keluar dari akun', 'password.change': 'Mengubah password' }[action] || action || 'Aktivitas akun');
+    const audit = P.backendEnabled
+      ? (P.security?.audit || []).map((item) => ({ t: item.at ? new Date(item.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '—', who: item.actor_label || ownerName, what: auditAction(item.action), ip: item.ip || '—' }))
+      : [['17 Okt, 14:32', 'Dina (CS)', 'Menandai Purchase Rp 89.000 · Dewi Lestari', '103.47.12.8'], ['17 Okt, 12:31', 'Sistem', 'WhatsApp +62 812-•••-7890 terputus', '—'], ['16 Okt, 20:10', 'Arif (Admin)', 'Mengubah aturan “Sudah transfer → Purchase”', '36.72.4.19'], ['16 Okt, 09:02', 'Rizky (Owner)', 'Mengundang ads@lumbungdigital.id sebagai Viewer', '103.47.12.8'], ['15 Okt, 18:44', 'Rizky (Owner)', 'Membuat API key “Google Sheets sync”', '103.47.12.8'], ['14 Okt, 08:15', 'Arif (Admin)', 'Mengganti access token Meta', '36.72.4.19']].map(([t, who, what, ip]) => ({ t, who, what, ip }));
+    const generalF = { ...s.f, ...(P.activeWorkspace ? { biz: P.activeWorkspace.name, industry: P.activeWorkspace.category || s.f.industry } : {}) };
     const delOk = (s.delName || '') === WS[s.ws][0];
     const se = {
       tabs: [['umum', 'Umum'], ['notif', 'Notifikasi'], ['keamanan', 'Keamanan']].map(([k, label]) => ({ label, pick: () => set({ setTab: k }), style: { fontFamily: 'inherit', height: 34, padding: '0 14px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', background: tabK === k ? 'var(--surface)' : 'transparent', color: tabK === k ? 'var(--text)' : 'var(--muted)' } })),
       umum: tabK === 'umum', tim: tabK === 'tim', paket: tabK === 'paket', notif: tabK === 'notif', keamanan: tabK === 'keamanan', privasi: tabK === 'privasi',
-      defEv: s.defEv || 'Purchase', setDefEv: (e) => set({ defEv: e.target.value }), defVal: s.defVal ?? '150.000', setDefVal: (e) => { const d = e.target.value.replace(/\D/g, ''); set({ defVal: d ? Number(d).toLocaleString('id-ID') : '' }); }, saveUmum: () => { if (!(s.f.biz || '').trim()) { say('Nama bisnis wajib diisi'); return; } say('Pengaturan disimpan', s.f.biz); },
+      defEv: s.defEv || 'Purchase', setDefEv: (e) => set({ defEv: e.target.value }), defVal: s.defVal ?? '150.000', setDefVal: (e) => { const d = e.target.value.replace(/\D/g, ''); set({ defVal: d ? Number(d).toLocaleString('id-ID') : '' }); }, saveUmum: async () => { if (!(generalF.biz || '').trim()) { say('Nama bisnis wajib diisi'); return; } try { if (P.saveWorkspaceSettings) await P.saveWorkspaceSettings({ name: generalF.biz.trim(), category: generalF.industry }); set({ f: { ...s.f, biz: generalF.biz, industry: generalF.industry } }); say('Pengaturan disimpan', generalF.biz); } catch (error) { say('Pengaturan gagal disimpan', error.message || 'Coba lagi.'); } },
       retention: s.retention || '90 hari', setRetention: (e) => set({ retention: e.target.value }),
-      invEmail: s.invEmail || '', setInvEmail: (e) => set({ invEmail: e.target.value }), invRole: s.invRole || 'CS', setInvRole: (e) => set({ invRole: e.target.value }),
+      invEmail: s.invEmail ?? '', setInvEmail: (e) => set({ invEmail: e.target.value }), invRole: s.invRole || 'CS', setInvRole: (e) => set({ invRole: e.target.value }),
       invite: () => { const em = (s.invEmail || '').trim(); if (!/.+@.+\..+/.test(em)) { say('Email belum valid'); return; } set({ invites: [...(s.invites || []), [em.split('@')[0], em, s.invRole || 'CS', 'Undangan terkirim']], invEmail: '' }); say('Undangan terkirim', em); },
       members: members.map(([name, email, role, state]) => ({ name, email, role, state, ini: ini(name), ps: roleP(role) })),
       perms: [['Lihat dashboard & laporan', 1, 1, 1, 1], ['Tandai Purchase di Leads', 1, 1, 1, 0], ['Kelola aturan otomatis', 1, 1, 0, 0], ['Kelola koneksi & API key', 1, 1, 0, 0], ['Undang & atur anggota', 1, 1, 0, 0], ['Paket, tagihan & hapus workspace', 1, 0, 0, 0]].map(([label, ...c]) => ({ label, cells: c.map((v) => ({ t: v ? '✓' : '—', s: { textAlign: 'center', fontWeight: 600, color: v ? 'var(--accentText)' : 'var(--borderStrong)' } })) })),
@@ -487,9 +506,9 @@ class Component extends DCLogic {
       invoices: [['INV-2026-0912', '12 Sep 2026', 'Starter · Bulanan', 149000], ['INV-2026-0812', '12 Agu 2026', 'Starter · Bulanan', 149000], ['INV-2026-0712', '12 Jul 2026', 'Starter · Bulanan', 149000]].map(([no, date, plan, a]) => ({ no, date, plan, amount: rp(a * 1.11), status: 'Lunas', pill: pill('ok'), dl: () => { const ok = printInvoice({ number: no, date, plan, amount: rp(a * 1.11), workspace: WS[s.ws][0] }); say(ok ? 'Invoice disiapkan' : 'Pop-up diblokir', ok ? 'Pilih “Simpan sebagai PDF” di dialog cetak' : 'Izinkan pop-up untuk mencetak invoice'); } })),
       notifs: NT.map(([label, desc, e, w], i) => { const em = nts['e' + i] ?? !!e, wa = nts['w' + i] ?? !!w; return { label, desc, em: sw(em, () => set({ nt: { ...nts, ['e' + i]: !em } })), wa: sw(wa, () => set({ nt: { ...nts, ['w' + i]: !wa } })) }; }),
       pw1: s.pw1 || '', pw2: s.pw2 || '', pw3: s.pw3 || '', setPw1: (e) => set({ pw1: e.target.value }), setPw2: (e) => set({ pw2: e.target.value }), setPw3: (e) => set({ pw3: e.target.value }),
-      savePw: () => { const err = checkPassword(s.pw1 || '', s.pw2 || '', s.pw3 || ''); if (err) { say(err); return; } set({ pw1: '', pw2: '', pw3: '', pwUpdated: Date.now(), sessOut: { 1: true, 2: true } }); say('Password diperbarui', 'Sesi lain sudah dikeluarkan'); },
-      sessions: sess.map(([icon, device, meta, current], i) => ({ icon, device, meta, current, other: !current, ps: pill('soft'), out: () => set({ sessOut: { ...(s.sessOut || {}), [i + 1]: true } }) })),
-      audit: [['17 Okt, 14:32', 'Dina (CS)', 'Menandai Purchase Rp 89.000 · Dewi Lestari', '103.47.12.8'], ['17 Okt, 12:31', 'Sistem', 'WhatsApp +62 812-•••-7890 terputus', '—'], ['16 Okt, 20:10', 'Arif (Admin)', 'Mengubah aturan “Sudah transfer → Purchase”', '36.72.4.19'], ['16 Okt, 09:02', 'Rizky (Owner)', 'Mengundang ads@lumbungdigital.id sebagai Viewer', '103.47.12.8'], ['15 Okt, 18:44', 'Rizky (Owner)', 'Membuat API key “Google Sheets sync”', '103.47.12.8'], ['14 Okt, 08:15', 'Arif (Admin)', 'Mengganti access token Meta', '36.72.4.19']].map(([t, who, what, ip]) => ({ t, who, what, ip })),
+      savePw: async () => { const err = checkPassword(s.pw1 || '', s.pw2 || '', s.pw3 || ''); if (err) { say(err); return; } try { if (P.changeSecurityPassword) await P.changeSecurityPassword(s.pw1, s.pw2); set({ pw1: '', pw2: '', pw3: '', pwUpdated: Date.now(), sessOut: {} }); say('Password diperbarui', 'Sesi lain sudah dikeluarkan'); } catch (error) { say('Password gagal diperbarui', error.message || 'Password saat ini salah.'); } },
+      sessions: sess.map(([icon, device, meta, current, id], i) => ({ icon, device, meta, current, other: !current, ps: pill('soft'), out: async () => { try { if (P.revokeSecuritySession && id) await P.revokeSecuritySession(id); else set({ sessOut: { ...(s.sessOut || {}), [i + 1]: true } }); say('Sesi dikeluarkan', device); } catch (error) { say('Sesi gagal dikeluarkan', error.message || 'Coba lagi.'); } } })),
+      audit,
       exportAll: () => { downloadJson('convera-export-' + new Date().toISOString().slice(0, 10) + '.json', { exported_at: new Date().toISOString(), workspace: WS[s.ws][0], leads: LEADS.map((l) => ({ id: l.id, name: l.name, phone: l.phone, campaign: l.A ? l.A.camp : null, ad: l.A ? l.A.name : null, first_message: l.msg, status: l.status, value: l.value, events: l.events })), manual_events: s.kvNew || [], rules: s.rulesList || null, settings: { default_event: s.defEv || 'Purchase', default_value: s.defVal ?? '150.000', retention: s.retention || '90 hari' } }); say('Data diekspor', 'File JSON sudah diunduh'); },
       delPhone: s.delPhone || '', setDelPhone: (e) => set({ delPhone: e.target.value }), delContact: () => { const ph = normPhone(s.delPhone || ''); if (ph.length < 9) { say('Isi nomor terlebih dahulu', 'Contoh: 0812-3456-7890'); return; }
         if (LV) { set({ delPhone: '' }); this.__host.liveErasePhone(ph).then((r) => say(r.ok ? 'Data kontak dihapus' : 'Gagal menghapus', r.message)); return; } const found = LEADS.filter((l) => normPhone(l.phone) === ph).length; if (!found) { say('Nomor tidak ditemukan', 'Tidak ada lead dengan nomor ini'); return; } set({ delPhone: '', delPhones: [...(s.delPhones || []), ph], kvNew: (s.kvNew || []).filter((e) => normPhone(e.phone) !== ph) }); say('Data kontak dihapus', found + ' lead & riwayat chat dihapus permanen'); },
@@ -533,7 +552,14 @@ class Component extends DCLogic {
     const W = s.width, mobile = W < 768, wide = W >= 1024;
     const ownerPhone = P.profilePhone ? normPhone(P.profilePhone) : '';
     const ownerPhoneMasked = ownerPhone ? ownerPhone.slice(0, 4) + '-•••-' + ownerPhone.slice(-4) : 'nomor belum diisi';
-    const common = { rootStyle, ic, toggleDark: () => this.setState({ dark: !dark, menu: null }), darkLabel: dark ? 'Mode terang' : 'Mode gelap', darkIcon: dark ? ic.sun : ic.moon, isOnboarding: screen === 'onboarding', isApp: screen === 'app' };
+    const metaConnected = !s.disc?.meta && !!s.f?.dataset && !!s.f?.token;
+    const waConnected = !!s.waOn && !s.disc?.wa;
+    const healthIssues = [metaConnected, waConnected].filter((connected) => !connected).length;
+    const healthSummary = healthIssues ? healthIssues + ' koneksi bermasalah' : 'Semua koneksi sehat';
+    const healthMetaStatus = metaConnected ? 'Terhubung · token berlaku ' + (s.tokenDays ?? 0) + ' hari lagi' : 'Terputus · hubungkan Meta Dataset';
+    const healthWaTitle = 'WhatsApp ' + ownerPhoneMasked;
+    const healthWaStatus = waConnected ? 'Terhubung · Cloud API' : 'Terputus · Cloud API';
+    const common = { rootStyle, ic, f: { ...s.f, ...(P.activeWorkspace ? { biz: P.activeWorkspace.name, industry: P.activeWorkspace.category || s.f.industry } : {}) }, toggleDark: () => this.setState({ dark: !dark, menu: null }), darkLabel: dark ? 'Mode terang' : 'Mode gelap', darkIcon: dark ? ic.sun : ic.moon, isOnboarding: screen === 'onboarding', isApp: screen === 'app' };
 
     // ---------- onboarding ----------
     const STEPS = [['Workspace', 'Profil bisnis'], ['Hubungkan Meta', 'Dataset & token'], ['Hubungkan WhatsApp', 'Cloud API atau QR'], ['Cara kirim konversi', 'API, manual, otomatis'], ['Selesai', 'Cek & kirim event uji']];
@@ -636,7 +662,7 @@ class Component extends DCLogic {
       pick: () => this.setState({ ws: w.i, menu: null, more: false, wsQuery: '' }),
       style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', background: w.i === s.ws ? 'var(--surface2)' : 'transparent' } }));
     const menu = (m) => () => this.setState({ menu: s.menu === m ? null : m });
-    const PRE = P.live ? [0, 1, 2, 3, 4, 5].map((i) => { const r = rangeFor(i); return [r.label, r.hint]; }) : [['Hari ini', '17 Okt'], ['Kemarin', '16 Okt'], ['7 hari terakhir', '11–17 Okt'], ['30 hari terakhir', '18 Sep–17 Okt'], ['Bulan ini', '1–17 Okt'], ['Bulan lalu', 'Sep 2026']];
+    const PRE = [0, 1, 2, 3, 4, 5].map((i) => { const r = rangeFor(i); return [r.label, r.hint]; });
     const presets = PRE.map(([label, hint], i) => ({ label, hint, pick: () => this.setState({ range: i, menu: null }), style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: i === s.range ? 500 : 400, background: i === s.range ? 'var(--accentSoft)' : 'transparent', color: i === s.range ? 'var(--accentText)' : 'var(--text)' } }));
     // Mode backend: notifikasi nyata dari API; mode demo tetap memakai data contoh.
     const agoId = (iso) => { const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 1 ? 'Baru saja' : m < 60 ? m + ' mnt lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
@@ -680,7 +706,7 @@ class Component extends DCLogic {
       newWs: () => this.setState({ screen: 'onboarding', step: 0, menu: null, test: 'idle', send: 'idle' }), allWs: () => this.setState({ page: 'agency', menu: null }),
       nav, menuOpen: false, closeMenus: () => this.setState({ menu: null }),
       openDate: menu('date'), dateMenu: s.menu === 'date', dateLabel: PRE[s.range][0] + (W >= 1280 ? ' · ' + PRE[s.range][1] : ''), presets,
-      openHealth: menu('health'), healthMenu: s.menu === 'health', goKoneksi: () => this.setState({ page: 'koneksi', menu: null }),
+      openHealth: menu('health'), healthMenu: s.menu === 'health', healthSummary, healthMetaStatus, healthWaTitle, healthWaStatus, goKoneksi: () => this.setState({ page: 'koneksi', menu: null }),
       openNotif: menu('notif'), notifMenu: s.menu === 'notif', notifs, unread: realNotifs ? (P.notifs.unread || 0) : (s.read ? 0 : 3), readAll: () => (realNotifs ? P.readAllNotifs && P.readAllNotifs() : this.setState({ read: true })),
       notifPanelStyle: { position: mobile ? 'fixed' : 'absolute', top: mobile ? 70 : 'calc(100% + 6px)', right: mobile ? 12 : 0, left: mobile ? 12 : 'auto', width: mobile ? 'auto' : 360, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 20px 44px -18px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
       openHelp: menu('help'), helpMenu: s.menu === 'help', openUser: menu('user'), userMenu: s.menu === 'user',

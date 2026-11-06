@@ -6,3 +6,5 @@ html,body{height:100%;margin:0}#root,#root>.sc-host{height:100%}
 .scp3:focus{box-shadow:inset 0 0 0 2px var(--accent) !important}
 .scp4:hover{background:var(--neutral) !important}
 .sc-interp.sc-missing{display:inline-block;width:2em;height:1em;overflow:hidden}
+.profile-layout{width:100%}
+@media (max-width:760px){.profile-layout{grid-template-columns:1fr !important}}

@@ -42,8 +42,14 @@ export async function register({ name, username, email, phone, password }) {
   if (!isPhone(phone)) throw new Error('Nomor telepon tidak valid');
   if (String(password).length < 8) throw new Error('Password minimal 8 karakter');
   const res = await requestJson(ENDPOINTS.register, { method: 'POST', body: JSON.stringify({ name, username, email, phone, password }) });
-  const user = res?.data?.user || { username, email, name, phone };
-  const session = { username: user.username || username, email: user.email || email, name: user.name || name, phone: user.phone || phone, at: new Date().toISOString() };
+  const user = res?.data?.user || res?.user || {};
+  const session = {
+    username: user.username || username,
+    email: user.email || email,
+    name: user.name || name,
+    phone: user.phone || normPhone(phone),
+    at: new Date().toISOString(),
+  };
   try { localStorage.setItem(KEY, JSON.stringify(session)); } catch {}
   return session;
 }

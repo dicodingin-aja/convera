@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { isPhone, checkPassword } from './services/validators.js';
 import { getSub, subInfo } from './plans.js';
 
-const field = { width: '100%', height: 42, padding: '0 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--input)', color: 'var(--text)', fontFamily: 'inherit', fontSize: 14, outline: 'none', boxSizing: 'border-box' };
-const card = { background: 'var(--surface2)', borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 };
-const label = { display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 500 };
-const ghost = { fontFamily: 'inherit', height: 36, padding: '0 14px', border: 0, borderRadius: 8, background: 'var(--surface)', color: 'var(--text)', fontSize: 13, cursor: 'pointer' };
+const field = { width: '100%', height: 44, padding: '0 13px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--input)', color: 'var(--text)', fontFamily: 'inherit', fontSize: 14, outline: 'none', boxSizing: 'border-box', transition: 'border-color .15s, box-shadow .15s' };
+const card = { background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 };
+const label = { display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 500, color: 'var(--text)' };
+const ghost = { fontFamily: 'inherit', height: 38, padding: '0 14px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--surface)', color: 'var(--text)', fontSize: 13, cursor: 'pointer' };
 
 function ProfileForm({ profile, onSave }) {
   const [form, setForm] = useState({ name: '', username: '', email: '', phone: '', ...profile });
@@ -26,7 +26,8 @@ function ProfileForm({ profile, onSave }) {
     }
     setSaving(true);
     try {
-      await onSave({ name: form.name.trim(), phone: form.phone.trim(), ...(pw.next ? { passwordUpdatedAt: new Date().toISOString() } : {}) });
+      if (pw.next) await onSave({ name: form.name.trim(), phone: form.phone.trim() }, { current: pw.current, next: pw.next });
+      else await onSave({ name: form.name.trim(), phone: form.phone.trim() }, null);
     } catch (err) { setSaving(false); return setError(err.message || 'Profil tidak dapat disimpan'); }
     setSaving(false); setPw({ current: '', next: '', again: '' }); setError(''); setSaved(true);
     window.setTimeout(() => setSaved(false), 2500);
@@ -34,21 +35,27 @@ function ProfileForm({ profile, onSave }) {
 
   return (
     <form onSubmit={submit} style={card}>
-      <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Profil</h2>
+      <div>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Profil</h2>
+        <p style={{ margin: '5px 0 0', color: 'var(--muted)', fontSize: 12 }}>Kelola informasi akun yang digunakan Convera.</p>
+      </div>
       <label style={label}>Username<input value={form.username || ''} readOnly disabled style={{ ...field, opacity: 0.7 }} /></label>
       <label style={label}>Email<input value={form.email || ''} readOnly disabled style={{ ...field, opacity: 0.7 }} /></label>
       {[['name', 'Nama lengkap', 'text'], ['phone', 'Nomor telepon', 'tel']].map(([k, l, type]) => (
         <label key={k} style={label}>{l}<input value={form[k]} onChange={upd(k)} type={type} style={field} /></label>
       ))}
-      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <span style={{ fontSize: 14, fontWeight: 500 }}>Ubah password</span>
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>Ubah password</span>
+          <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: 12 }}>Password baru akan disimpan dan diverifikasi oleh server.</p>
+        </div>
         {[['current', 'Password saat ini'], ['next', 'Password baru'], ['again', 'Ulangi password baru']].map(([k, l]) => (
-          <label key={k} style={label}>{l}<input value={pw[k]} onChange={updPw(k)} type="password" autoComplete="new-password" style={field} /></label>
+          <label key={k} style={label}><span>{l}</span><input value={pw[k]} onChange={updPw(k)} type="password" autoComplete={k === 'current' ? 'current-password' : 'new-password'} style={field} /></label>
         ))}
       </div>
       {error ? <p role="alert" style={{ margin: 0, color: 'var(--danger)', fontSize: 13 }}>{error}</p> : null}
-      {saved ? <p role="status" style={{ margin: 0, color: 'var(--text)', fontSize: 13 }}>Tersimpan.</p> : null}
-      <button type="submit" disabled={saving} style={{ height: 42, border: 0, borderRadius: 8, background: 'var(--accent)', color: '#fff', fontFamily: 'inherit', fontSize: 14, fontWeight: 500, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Menyimpan…' : 'Simpan'}</button>
+      {saved ? <p role="status" style={{ margin: 0, padding: '10px 12px', borderRadius: 9, background: 'var(--okBg)', color: 'var(--okFg)', fontSize: 13, fontWeight: 500 }}>✓ Perubahan berhasil disimpan.</p> : null}
+      <button type="submit" disabled={saving} style={{ height: 44, border: 0, borderRadius: 10, background: 'var(--accent)', color: '#fff', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Menyimpan…' : 'Simpan perubahan'}</button>
     </form>
   );
 }
@@ -62,9 +69,12 @@ export default function ProfilePage({ themeStyle, profile, onSave, workspaces, a
         <button type="button" onClick={onBack} style={{ ...ghost, background: 'transparent', paddingLeft: 0 }}>← Kembali</button>
         <button type="button" onClick={onLogout} style={{ ...ghost, color: 'var(--danger)' }}>Keluar</button>
       </header>
-      <main style={{ maxWidth: 720, margin: '0 auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Profil saya</h1>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <main style={{ maxWidth: 720, margin: '0 auto', padding: '32px 24px 48px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 650, letterSpacing: '-.02em' }}>Profil saya</h1>
+          <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 13 }}>Perbarui data akun dan keamanan login Anda.</p>
+        </div>
+        <div className="profile-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(280px, .85fr)', alignItems: 'start', gap: 20 }}>
           <ProfileForm profile={profile} onSave={onSave} />
           <section style={card}>
             <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Workspace</h2>

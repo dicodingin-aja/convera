@@ -6,7 +6,7 @@ import { load, save, reset } from './services/storage.js';
 import ProfilePage from './ProfilePage.jsx';
 import { LaporanPage, DashboardExtras } from './ReportViews.jsx';
 import PlansModal from './PlansModal.jsx';
-import { updateProfile, ensureWorkspace, getSubscription, listWorkspaces } from './services/backend.js';
+import { updateProfile, changePassword, ensureWorkspace, getSubscription, listWorkspaces, updateWorkspace, listSessions, revokeSession, listAuditLogs } from './services/backend.js';
 import AddWorkspaceCard from './CreateWorkspace.jsx';
 import QrScanPage from './QrScanPage.jsx';
 import { fetchLive, emptyLive, liveApi, notifApi, rangeFor } from './services/live.js';
@@ -80,6 +80,10 @@ export default class App extends React.Component {
     };
     this.logic.state = { ...this.logic.state, profile, menu: null };
     save(this.logic.state);
+    try {
+      const current = JSON.parse(localStorage.getItem('convera:auth') || '{}');
+      localStorage.setItem('convera:auth', JSON.stringify({ ...current, ...session, phone: profile.phone }));
+    } catch {}
     this.setState({ session, workspaces: null });
     this.loadWorkspaces(session);
   };
@@ -102,7 +106,7 @@ export default class App extends React.Component {
   loadWorkspaces = async (session = this.state.session) => {
     if (!appConfig.backendEnabled || !session) return;
     try {
-      const list = (await listWorkspaces()).map((w) => ({ name: w.name, slug: w.slug, meta: [w.category, w.city].filter(Boolean).join(' · ') || 'Workspace' }));
+      const list = (await listWorkspaces()).map((w) => ({ name: w.name, slug: w.slug, category: w.category || '', city: w.city || '', meta: [w.category, w.city].filter(Boolean).join(' · ') || 'Workspace' }));
       const ws = this.logic.state.ws;
       if (ws >= list.length) this.__setLogicState({ ws: 0 });
       this.setState({ workspaces: list });
@@ -116,9 +120,37 @@ export default class App extends React.Component {
     this._liveKey = null;
     this.setState({ createWsOpen: false, live: null, realSub: null, route: null });
   };
-  saveProfile = async (profile) => {
+  saveProfile = async (profile, password) => {
     const savedProfile = await updateProfile(profile);
+    if (password) await changePassword(password.current, password.next);
     this.__setLogicState({ profile: savedProfile });
+  };
+  loadSecurity = async () => {
+    if (!appConfig.backendEnabled || !this.state.session) return;
+    try {
+      const [sessions, audit] = await Promise.all([listSessions(), listAuditLogs()]);
+      this.setState({ security: { sessions, audit } });
+    } catch (error) {
+      this.setState({ securityError: error.message || 'Data keamanan tidak dapat dimuat.' });
+    }
+  };
+  saveSecurityPassword = async (current, next) => {
+    await changePassword(current, next);
+    await this.loadSecurity();
+  };
+  revokeSecuritySession = async (id) => {
+    await revokeSession(id);
+    await this.loadSecurity();
+  };
+  saveWorkspaceSettings = async (body) => {
+    const active = this.state.workspaces?.[this.logic.state.ws];
+    if (!appConfig.backendEnabled || !active?.slug) return;
+    const updated = await updateWorkspace(active.slug, body);
+    const workspaces = (this.state.workspaces || []).map((w) => w.slug === active.slug
+      ? { ...w, name: updated.name, category: updated.category || '', city: updated.city || '', meta: [updated.category, updated.city].filter(Boolean).join(' · ') || 'Workspace' }
+      : w);
+    this.setState({ workspaces });
+    this.logic.state = { ...this.logic.state, f: { ...this.logic.state.f, biz: updated.name, industry: updated.category || this.logic.state.f.industry } };
   };
   // Mode backend: status langganan workspace aktif diambil dari server (bukan data contoh).
   loadRealSub = async () => {
@@ -204,6 +236,10 @@ export default class App extends React.Component {
       if (this._liveKey !== key) { this._liveKey = key; this.refreshLive(); }
       this.fetchOpenDetails();
     }
+    if (appConfig.backendEnabled && this.state.session && this.logic.state.page === 'pengaturan') {
+      const key = this.state.session.username + '|' + this._activeWsSlug;
+      if (this._securityKey !== key) { this._securityKey = key; this.loadSecurity(); }
+    }
     if (appConfig.backendEnabled && this.state.session && this._notifSession !== this.state.session) { this._notifSession = this.state.session; this.refreshNotifs(); }
     const ws = this._activeWsName;
     if (appConfig.backendEnabled && this.state.session && ws && (this._subWs !== ws || this._subSession !== this.state.session)) {
@@ -214,8 +250,8 @@ export default class App extends React.Component {
   componentWillUnmount() { this.logic.componentWillUnmount(); window.removeEventListener('convera:unauthorized', this.handleUnauthorized); clearInterval(this._liveTimer); }
   render() {
     this.logic.props = appConfig.backendEnabled && this.state.workspaces
-      ? { ...this.props_, workspaces: this.state.workspaces, live: this.state.live || emptyLive(this.logic.state.range ?? 2), notifs: this.state.notifs || { items: [], unread: 0 }, readAllNotifs: this.readAllNotifs, profilePhone: this.logic.state.profile?.phone || this.state.session.phone || '' }
-      : { ...this.props_, profilePhone: this.logic.state.profile?.phone || this.state.session?.phone || '' };
+      ? { ...this.props_, backendEnabled: true, workspaces: this.state.workspaces, activeWorkspace: this.state.workspaces[this.logic.state.ws], security: this.state.security, live: this.state.live || emptyLive(this.logic.state.range ?? 2), notifs: this.state.notifs || { items: [], unread: 0 }, readAllNotifs: this.readAllNotifs, saveWorkspaceSettings: this.saveWorkspaceSettings, changeSecurityPassword: this.saveSecurityPassword, revokeSecuritySession: this.revokeSecuritySession, profileName: this.logic.state.profile?.name || this.state.session.name || '', profileEmail: this.logic.state.profile?.email || this.state.session.email || '', profilePhone: this.logic.state.profile?.phone || this.state.session.phone || '' }
+      : { ...this.props_, backendEnabled: false, profileName: this.logic.state.profile?.name || this.state.session?.name || '', profileEmail: this.logic.state.profile?.email || this.state.session?.email || '', profilePhone: this.logic.state.profile?.phone || this.state.session?.phone || '' };
     const vals = { ...this.props_, ...(this.logic.renderVals() || {}) };
     if (!this.state.session) return <LoginPage themeStyle={vals.rootStyle} onLogin={this.handleLogin} />;
     if (appConfig.backendEnabled) {

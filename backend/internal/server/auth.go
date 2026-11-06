@@ -142,6 +142,12 @@ func (s *Server) startSession(c *gin.Context, userID string, status int, usernam
 		serverError(c, err)
 		return
 	}
+	if _, err := s.DB.Exec(c, `INSERT INTO audit_logs (actor_type, actor_id, actor_label, action, detail, ip)
+		VALUES ('user', $1::uuid, $2, 'auth.login', jsonb_build_object('user_agent', $3), NULLIF($4,'')::inet)`,
+		userID, name, c.Request.UserAgent(), c.ClientIP()); err != nil {
+		serverError(c, err)
+		return
+	}
 	_, _ = s.DB.Exec(c, `UPDATE users SET last_seen_at = now() WHERE id = $1`, userID)
 	max := int(sessionTTL.Seconds())
 	c.SetSameSite(http.SameSiteLaxMode)
@@ -153,6 +159,10 @@ func (s *Server) startSession(c *gin.Context, userID string, status int, usernam
 func (s *Server) logout(c *gin.Context) {
 	if t, err := c.Cookie(sessionCookie); err == nil {
 		_, _ = s.DB.Exec(c, `UPDATE sessions SET revoked_at = now() WHERE token_hash = $1`, secure.HashToken(t))
+	}
+	if !isSupport(c) {
+		_, _ = s.DB.Exec(c, `INSERT INTO audit_logs (actor_type, actor_id, actor_label, action, ip)
+			VALUES ('user', $1::uuid, 'user', 'auth.logout', NULLIF($2,'')::inet)`, c.GetString("user_id"), c.ClientIP())
 	}
 	if isSupport(c) {
 		_, _ = s.DB.Exec(c, `INSERT INTO audit_logs (actor_type, actor_id, actor_label, workspace_id, action, target_type, ip)
@@ -171,6 +181,7 @@ func (s *Server) session(c *gin.Context) {
 		serverError(c, err)
 		return
 	}
+
 	out := gin.H{"user": gin.H{"id": c.GetString("user_id"), "username": username, "email": email, "name": name, "phone": phone}}
 	if isSupport(c) {
 		var slug, wsName string
@@ -181,6 +192,61 @@ func (s *Server) session(c *gin.Context) {
 		out["support"] = gin.H{"admin": c.GetString("support_admin_name"), "workspace": slug, "workspace_name": wsName, "expires_at": exp}
 	}
 	ok(c, out)
+}
+
+func (s *Server) listSessions(c *gin.Context) {
+	token, _ := c.Cookie(sessionCookie)
+	rows, err := query(c, s.DB, `SELECT id::text, user_agent, host(ip)::text, created_at, last_used_at,
+		expires_at, token_hash = $2 AS current
+		FROM sessions
+		WHERE user_id::text = $1 AND revoked_at IS NULL AND expires_at > now()
+		ORDER BY current DESC, last_used_at DESC NULLS LAST, created_at DESC`,
+		c.GetString("user_id"), secure.HashToken(token))
+	if err != nil {
+		serverError(c, err)
+		return
+	}
+	ok(c, rows)
+}
+
+func (s *Server) revokeSession(c *gin.Context) {
+	token, _ := c.Cookie(sessionCookie)
+	var current bool
+	err := s.DB.QueryRow(c, `SELECT token_hash = $3 FROM sessions
+		WHERE id = $1::uuid AND user_id::text = $2 AND revoked_at IS NULL`,
+		c.Param("id"), c.GetString("user_id"), secure.HashToken(token)).Scan(&current)
+	if errors.Is(err, pgx.ErrNoRows) {
+		fail(c, http.StatusNotFound, "session_not_found", "Sesi tidak ditemukan.")
+		return
+	}
+	if err != nil {
+		serverError(c, err)
+		return
+	}
+	if current {
+		fail(c, http.StatusBadRequest, "current_session", "Sesi yang sedang digunakan tidak dapat dikeluarkan.")
+		return
+	}
+	if _, err := s.DB.Exec(c, `UPDATE sessions SET revoked_at = now()
+		WHERE id = $1::uuid AND user_id::text = $2 AND revoked_at IS NULL`,
+		c.Param("id"), c.GetString("user_id")); err != nil {
+		serverError(c, err)
+		return
+	}
+	ok(c, gin.H{"revoked": true})
+}
+
+func (s *Server) listUserAuditLogs(c *gin.Context) {
+	rows, err := query(c, s.DB, `SELECT at, COALESCE(actor_label, 'Sistem') AS actor_label,
+		action, host(ip)::text AS ip
+		FROM audit_logs
+		WHERE actor_type = 'user' AND actor_id::text = $1
+		ORDER BY at DESC LIMIT 100`, c.GetString("user_id"))
+	if err != nil {
+		serverError(c, err)
+		return
+	}
+	ok(c, rows)
 }
 
 // ---------- Middleware sesi ----------
@@ -217,6 +283,7 @@ WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()
 			// Presence untuk "online sekarang" di Convera Admin; paling sering sekali per menit per user.
 			_, _ = s.DB.Exec(c, `UPDATE users SET last_seen_at = now() WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - interval '1 minute')`, userID)
 		}
+		_, _ = s.DB.Exec(c, `UPDATE sessions SET last_used_at = now() WHERE token_hash = $1`, secure.HashToken(t))
 		c.Set("user_id", userID)
 		c.Next()
 	}

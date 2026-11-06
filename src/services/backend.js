@@ -22,6 +22,25 @@ export async function updateProfile(profile) {
   return response?.data || response;
 }
 
+export async function changePassword(current, next) {
+  if (!appConfig.backendEnabled) return { changed: true };
+  return requestJson('/api/v1/me/password', {
+    method: 'POST',
+    body: JSON.stringify({ current, new: next }),
+  });
+}
+
+export const listSessions = async () => (await requestJson('/api/v1/me/sessions'))?.data || [];
+export const revokeSession = async (id) =>
+  (await requestJson(`/api/v1/me/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }))?.data;
+export const listAuditLogs = async () => (await requestJson('/api/v1/me/audit-logs'))?.data || [];
+
+export const updateWorkspace = async (slug, body) =>
+  (await requestJson(`/api/v1/workspaces/${encodeURIComponent(slug)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  }))?.data;
+
 // ---- Workspace: daftar workspace di UI dicocokkan dengan backend lewat nama ----
 
 const slugCache = new Map(); // nama workspace -> slug backend (per sesi halaman)
