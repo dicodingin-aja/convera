@@ -645,11 +645,13 @@ class Component extends DCLogic {
     ];
     const navItem = (id, label, iconKey, badge, group) => {
       const a = s.page === id;
+      const locked = P.subExpired && id !== 'overview';
       return { label, icon: ic[iconKey], badge: expanded ? badge : null, group: expanded ? group : (group ? ' ' : null), showLabel: expanded,
         alert: id === 'koneksi', alertStyle: { width: 7, height: 7, borderRadius: '50%', background: 'var(--errDotStrong)', flex: 'none', ...(collapsed ? { position: 'absolute', top: 8, right: 10 } : {}) },
         groupStyle: expanded ? { fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', color: 'var(--muted)', padding: '14px 10px 6px' } : { display: 'block', height: 1, background: 'var(--border)', margin: '10px 8px' },
-        go: () => this.setState({ page: id, menu: null, more: false }),
-        style: { fontFamily: 'inherit', position: 'relative', display: 'flex', alignItems: 'center', gap: 12, width: '100%', height: 40, padding: collapsed ? 0 : '0 10px', justifyContent: collapsed ? 'center' : 'flex-start', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: a ? 500 : 400, textAlign: 'left', background: a ? 'var(--accentSoft)' : 'transparent', color: a ? 'var(--accentText)' : 'var(--muted)', flex: 'none' } };
+        locked,
+        go: () => { if (locked) return; this.setState({ page: id, menu: null, more: false }); },
+        style: { fontFamily: 'inherit', position: 'relative', display: 'flex', alignItems: 'center', gap: 12, width: '100%', height: 40, padding: collapsed ? 0 : '0 10px', justifyContent: collapsed ? 'center' : 'flex-start', borderRadius: 10, border: 'none', cursor: locked ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: a ? 500 : 400, textAlign: 'left', background: a ? 'var(--accentSoft)' : 'transparent', color: a ? 'var(--accentText)' : locked ? 'var(--border)' : 'var(--muted)', flex: 'none', opacity: locked ? 0.45 : 1 } };
     };
     const nav = NAV.filter(([id]) => id !== 'agency').map(([id, l, i, b, g]) => navItem(id, l, i, b, g));
     const sidebarStyle = { width: collapsed ? 76 : 264, flex: 'none', position: 'sticky', top: 0, height: '100vh', display: 'flex', flexDirection: 'column', gap: 16, padding: collapsed ? '18px 12px' : '18px 14px', background: 'var(--surface)', borderRight: '1px solid var(--border)', transition: 'width .2s', zIndex: 32 };
@@ -667,12 +669,27 @@ class Component extends DCLogic {
     // Mode backend: notifikasi nyata dari API; mode demo tetap memakai data contoh.
     const agoId = (iso) => { const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 1 ? 'Baru saja' : m < 60 ? m + ' mnt lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
     const realNotifs = P.live ? ((P.notifs && P.notifs.items) || []) : null;
+    // Notif trial: inject di posisi pertama jika status trial atau expired
+    const trialNotif = (() => {
+      const rs = P.realSub;
+      if (!rs) return null;
+      const daysLeft = rs.trial_until ? Math.max(0, Math.ceil((new Date(rs.trial_until) - Date.now()) / 864e5)) : 0;
+      if (rs.status === 'trial' && daysLeft > 0) {
+        const tone = daysLeft <= 3 ? 'err' : 'warn';
+        const icon = daysLeft <= 3 ? 'alert' : 'clock';
+        return [tone, icon, 'Trial tersisa ' + daysLeft + ' hari · Upgrade sekarang agar semua fitur tetap aktif.', 'Sekarang', true];
+      }
+      if (rs.status === 'expired' || rs.status === 'stopped' || (rs.status === 'trial' && daysLeft === 0)) {
+        return ['err', 'alert', 'Masa trial berakhir · Semua fitur terkunci kecuali Overview. Upgrade untuk membuka akses penuh.', 'Sekarang', true];
+      }
+      return null;
+    })();
     const NOT = realNotifs
-      ? realNotifs.map((n) => {
+      ? [...(trialNotif ? [trialNotif] : []), ...realNotifs.map((n) => {
         const ty = String(n.type || '');
         const tn = /reject|invalid|fail|disconnect|expired/.test(ty) ? 'err' : /remind|expir|token|trial|soon/.test(ty) ? 'warn' : /approv|activ|paid|success|verified/.test(ty) ? 'ok' : 'info';
         return [tn, tn === 'err' ? 'alert' : tn === 'warn' ? 'clock' : tn === 'ok' ? 'bag' : 'users', n.body ? n.title + ' · ' + n.body : n.title, agoId(n.created_at), !n.read_at];
-      })
+      })]
       : [['err', 'alert', 'WhatsApp ' + ownerPhoneMasked + ' terputus. Event dari nomor ini ditahan.', '2 jam lalu'], ['warn', 'clock', 'Token Meta kedaluwarsa dalam 5 hari.', '5 jam lalu'], ['ok', 'bag', '48 Purchase terkirim kemarin · Rp 21.300.000', 'Kemarin, 08.00'], ['info', 'users', 'Dina (CS) bergabung ke workspace Kopi Senja.', '2 hari lalu']];
     const isUnread = (k, flag) => (realNotifs ? !!flag : !s.read && k < 3);
     const tone = { err: ['var(--errBg)', 'var(--errFg)'], warn: ['var(--warnBg)', 'var(--warnFg)'], ok: ['var(--okBg)', 'var(--okFg)'], info: ['var(--neutral)', 'var(--text)'] };
@@ -691,13 +708,22 @@ class Component extends DCLogic {
       iconStyle: { display: 'flex', flex: 'none', color: bStyle[t][1] } }));
     const page = NAV.find(([id]) => id === s.page) || NAV[0];
     const MOB = [['overview', 'Overview', 'dash'], ['leads', 'Leads', 'users'], ['konversi', 'Konversi', 'bag'], ['more', 'Lainnya', 'more']];
-    const bottomNav = MOB.map(([id, label, i]) => { const a = id === 'more' ? s.more || !['overview', 'leads', 'konversi'].includes(s.page) : s.page === id; return { label, icon: ic[i],
-      go: () => (id === 'more' ? this.setState({ more: true }) : this.setState({ page: id, more: false })),
-      style: { fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: a ? 600 : 400, color: a ? 'var(--accentText)' : 'var(--muted)' } }; });
-    const moreNav = NAV.filter(([id]) => !['overview', 'leads', 'konversi'].includes(id)).map(([id, label, i, badge]) => ({ label, badge, icon: ic[i], go: () => this.setState({ page: id, more: false }),
-      style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 10, height: 48, padding: '0 12px', borderRadius: 10, border: '1px solid var(--border)', background: s.page === id ? 'var(--accentSoft)' : 'var(--surface)', color: 'var(--text)', fontSize: 13, fontWeight: 400, cursor: 'pointer' } }));
+    const bottomNav = MOB.map(([id, label, i]) => {
+      const a = id === 'more' ? s.more || !['overview', 'leads', 'konversi'].includes(s.page) : s.page === id;
+      const locked = P.subExpired && id !== 'overview' && id !== 'more';
+      return { label, icon: ic[i], locked,
+        go: () => { if (locked) return; id === 'more' ? this.setState({ more: true }) : this.setState({ page: id, more: false }); },
+        style: { fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: locked ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: a ? 600 : 400, color: locked ? 'var(--border)' : a ? 'var(--accentText)' : 'var(--muted)', opacity: locked ? 0.45 : 1 } };
+    });
+    const moreNav = NAV.filter(([id]) => !['overview', 'leads', 'konversi'].includes(id)).map(([id, label, i, badge]) => {
+      const locked = P.subExpired && id !== 'overview';
+      return { label, badge, icon: ic[i], locked,
+        go: () => { if (locked) return; this.setState({ page: id, more: false }); },
+        style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 10, height: 48, padding: '0 12px', borderRadius: 10, border: '1px solid var(--border)', background: s.page === id ? 'var(--accentSoft)' : 'var(--surface)', color: locked ? 'var(--border)' : 'var(--text)', fontSize: 13, fontWeight: 400, cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.45 : 1 } };
+    });
     const app = {
       mobile, notMobile: !mobile, wideTop: W >= 1180, showSidebar: !mobile, expanded, collapsedQuota: collapsed, sidebarStyle,
+      subExpired: !!P.subExpired,
       sbHeadStyle: { display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', flexDirection: collapsed ? 'column' : 'row', gap: 10, padding: collapsed ? 0 : '2px 4px 2px 6px' },
       toggleCollapse: () => this.setState({ collapsed: !collapsed }),
       wsName: WS[s.ws][0], wsMeta: WS[s.ws][1] + ' · Growth', wsInitial: WS[s.ws][0].charAt(0),
@@ -707,7 +733,7 @@ class Component extends DCLogic {
       nav, menuOpen: false, closeMenus: () => this.setState({ menu: null }),
       openDate: menu('date'), dateMenu: s.menu === 'date', dateLabel: PRE[s.range][0] + (W >= 1280 ? ' · ' + PRE[s.range][1] : ''), presets,
       openHealth: menu('health'), healthMenu: s.menu === 'health', healthSummary, healthMetaStatus, healthWaTitle, healthWaStatus, goKoneksi: () => this.setState({ page: 'koneksi', menu: null }),
-      openNotif: menu('notif'), notifMenu: s.menu === 'notif', notifs, unread: realNotifs ? (P.notifs.unread || 0) : (s.read ? 0 : 3), readAll: () => (realNotifs ? P.readAllNotifs && P.readAllNotifs() : this.setState({ read: true })),
+      openNotif: menu('notif'), notifMenu: s.menu === 'notif', notifs, unread: realNotifs ? ((P.notifs.unread || 0) + (trialNotif ? 1 : 0)) : (s.read ? 0 : 3), readAll: () => (realNotifs ? P.readAllNotifs && P.readAllNotifs() : this.setState({ read: true })),
       notifPanelStyle: { position: mobile ? 'fixed' : 'absolute', top: mobile ? 70 : 'calc(100% + 6px)', right: mobile ? 12 : 0, left: mobile ? 12 : 'auto', width: mobile ? 'auto' : 360, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 20px 44px -18px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
       openHelp: menu('help'), helpMenu: s.menu === 'help', openUser: menu('user'), userMenu: s.menu === 'user',
       goOnboarding: () => this.setState({ screen: 'onboarding', menu: null }),

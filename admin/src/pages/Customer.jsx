@@ -41,7 +41,7 @@ function Detail({ id, onClose, onChanged }) {
   return (
     <>
       <Modal title={d.name} wide onClose={onClose}>
-        <div className="row"><Pill tone={tone}>{label}</Pill><span className="muted">{d.owner} · {d.phone || 'tanpa telepon'} · {d.city || '—'}</span></div>
+        <div className="row"><Pill tone={tone}>{label}</Pill><span className="muted">{d.owner} · <b style={{ fontWeight: 600 }}>@{d.username}</b> · {d.phone || 'tanpa telepon'} · {d.city || '—'}</span></div>
         <div className="grid g3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
           <div className="card"><span className="caps">Paket</span><b style={{ fontWeight: 500 }}>{d.plan_name || '—'}</b></div>
           <div className="card"><span className="caps">Sales</span><b style={{ fontWeight: 500 }}>{d.sales || '—'}</b></div>
@@ -147,7 +147,7 @@ export default function Customer() {
             <tbody>
               {rows.map((c, i) => { const [label, tone] = statusInfo(c); const [d1, d2, warn] = untilInfo(c); return (
                 <tr key={c.id} className="click" onClick={() => setSel(c.id)}>
-                  <td><div className="row nowrap"><Av name={c.name} i={i} /><div><b style={{ fontWeight: 600 }}>{c.name}</b><div className="muted sm">{c.owner} · {c.city || '—'}</div></div></div></td>
+                  <td><div className="row nowrap"><Av name={c.name} i={i} /><div><b style={{ fontWeight: 600 }}>{c.name}</b><div className="muted sm">{c.owner} · @{c.username} · {c.city || '—'}</div></div></div></td>
                   <td>{c.plan_name || '—'}</td>
                   <td><Pill tone={tone}>{label}</Pill></td>
                   <td><span className="row nowrap"><span className={'dot' + (c.online ? ' on' : '')} /><span style={{ color: c.online ? 'var(--accentText)' : 'var(--muted)', fontWeight: c.online ? 500 : 400 }}>{lastSeenText(c)}</span></span></td>

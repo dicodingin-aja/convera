@@ -143,7 +143,7 @@ func (s *Server) startSession(c *gin.Context, userID string, status int, usernam
 		return
 	}
 	if _, err := s.DB.Exec(c, `INSERT INTO audit_logs (actor_type, actor_id, actor_label, action, detail, ip)
-		VALUES ('user', $1::uuid, $2, 'auth.login', jsonb_build_object('user_agent', $3), NULLIF($4,'')::inet)`,
+		VALUES ('user', $1::uuid, $2, 'auth.login', jsonb_build_object('user_agent', $3::text), NULLIF($4,'')::inet)`,
 		userID, name, c.Request.UserAgent(), c.ClientIP()); err != nil {
 		serverError(c, err)
 		return

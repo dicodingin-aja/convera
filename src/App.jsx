@@ -250,8 +250,8 @@ export default class App extends React.Component {
   componentWillUnmount() { this.logic.componentWillUnmount(); window.removeEventListener('convera:unauthorized', this.handleUnauthorized); clearInterval(this._liveTimer); }
   render() {
     this.logic.props = appConfig.backendEnabled && this.state.workspaces
-      ? { ...this.props_, backendEnabled: true, workspaces: this.state.workspaces, activeWorkspace: this.state.workspaces[this.logic.state.ws], security: this.state.security, live: this.state.live || emptyLive(this.logic.state.range ?? 2), notifs: this.state.notifs || { items: [], unread: 0 }, readAllNotifs: this.readAllNotifs, saveWorkspaceSettings: this.saveWorkspaceSettings, changeSecurityPassword: this.saveSecurityPassword, revokeSecuritySession: this.revokeSecuritySession, profileName: this.logic.state.profile?.name || this.state.session.name || '', profileEmail: this.logic.state.profile?.email || this.state.session.email || '', profilePhone: this.logic.state.profile?.phone || this.state.session.phone || '' }
-      : { ...this.props_, backendEnabled: false, profileName: this.logic.state.profile?.name || this.state.session?.name || '', profileEmail: this.logic.state.profile?.email || this.state.session?.email || '', profilePhone: this.logic.state.profile?.phone || this.state.session?.phone || '' };
+      ? { ...this.props_, backendEnabled: true, workspaces: this.state.workspaces, activeWorkspace: this.state.workspaces[this.logic.state.ws], security: this.state.security, live: this.state.live || emptyLive(this.logic.state.range ?? 2), notifs: this.state.notifs || { items: [], unread: 0 }, readAllNotifs: this.readAllNotifs, saveWorkspaceSettings: this.saveWorkspaceSettings, changeSecurityPassword: this.saveSecurityPassword, revokeSecuritySession: this.revokeSecuritySession, profileName: this.logic.state.profile?.name || this.state.session.name || '', profileEmail: this.logic.state.profile?.email || this.state.session.email || '', profilePhone: this.logic.state.profile?.phone || this.state.session.phone || '', realSub: this.state.realSub }
+      : { ...this.props_, backendEnabled: false, profileName: this.logic.state.profile?.name || this.state.session?.name || '', profileEmail: this.logic.state.profile?.email || this.state.session?.email || '', profilePhone: this.logic.state.profile?.phone || this.state.session?.phone || '', realSub: null };
     const vals = { ...this.props_, ...(this.logic.renderVals() || {}) };
     if (!this.state.session) return <LoginPage themeStyle={vals.rootStyle} onLogin={this.handleLogin} />;
     if (appConfig.backendEnabled) {
@@ -277,6 +277,19 @@ export default class App extends React.Component {
       const left = (x) => Math.max(0, Math.ceil((new Date(x) - Date.now()) / 864e5));
       vals.subStatus = { active: 'Aktif · s/d ' + d(rs.current_period_end), trial: 'Trial · ' + left(rs.trial_until) + ' hari', pending: 'Menunggu verifikasi', expired: 'Berakhir', stopped: 'Dihentikan' }[rs.status] || 'Belum berlangganan';
       vals.subBtn = rs.status === 'active' ? 'Perpanjang' : 'Upgrade';
+      const isExpired = rs.status === 'expired' || rs.status === 'stopped' || rs.status === 'pending' ||
+        (rs.status === 'trial' && left(rs.trial_until) === 0);
+      vals.subExpired = isExpired;
+      // Redirect ke overview jika halaman saat ini terkunci
+      if (isExpired && st.page !== 'overview') {
+        this.__setLogicState({ page: 'overview' });
+      }
+      // Lock semua pg kecuali overview
+      if (isExpired) {
+        vals.pg = Object.fromEntries(Object.entries(vals.pg || {}).map(([k, v]) => [k, k === 'overview' ? v : false]));
+      }
+    } else {
+      vals.subExpired = false;
     }
     vals.openPlans = () => this.openPlans(st.ws);
     // halaman Koneksi: setting per workspace (key = reset form saat pindah workspace)
