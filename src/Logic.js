@@ -90,6 +90,8 @@ class Component extends DCLogic {
 
   pagesVals(s, P, ic, W, mobile, WS) {
     const set = (o) => this.setState(o);
+    const ownerPhone = P.profilePhone ? normPhone(P.profilePhone) : '';
+    const ownerPhoneMasked = ownerPhone ? ownerPhone.slice(0, 4) + '-•••-' + ownerPhone.slice(-4) : 'nomor belum diisi';
     // Mode backend: P.live berisi data nyata dari API (leads, event, aturan, overview). Tanpa itu, data contoh dipakai.
     const LV = P.live || null;
     const sem = P.statusStyle === 'semantic';
