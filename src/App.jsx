@@ -70,7 +70,14 @@ export default class App extends React.Component {
   };
   handleLogin = (session) => {
     const p = this.logic.state.profile || {};
-    const profile = p.username === session.username ? p : { ...p, name: session.name, username: session.username, email: session.email };
+    const sameUser = p.username === session.username;
+    const profile = {
+      ...(sameUser ? p : {}),
+      name: session.name || (sameUser ? p.name : ''),
+      username: session.username,
+      email: session.email || (sameUser ? p.email : ''),
+      phone: session.phone || (sameUser ? p.phone : ''),
+    };
     this.logic.state = { ...this.logic.state, profile, menu: null };
     save(this.logic.state);
     this.setState({ session, workspaces: null });
@@ -207,8 +214,8 @@ export default class App extends React.Component {
   componentWillUnmount() { this.logic.componentWillUnmount(); window.removeEventListener('convera:unauthorized', this.handleUnauthorized); clearInterval(this._liveTimer); }
   render() {
     this.logic.props = appConfig.backendEnabled && this.state.workspaces
-      ? { ...this.props_, workspaces: this.state.workspaces, live: this.state.live || emptyLive(this.logic.state.range ?? 2), notifs: this.state.notifs || { items: [], unread: 0 }, readAllNotifs: this.readAllNotifs }
-      : this.props_;
+      ? { ...this.props_, workspaces: this.state.workspaces, live: this.state.live || emptyLive(this.logic.state.range ?? 2), notifs: this.state.notifs || { items: [], unread: 0 }, readAllNotifs: this.readAllNotifs, profilePhone: this.logic.state.profile?.phone || this.state.session.phone || '' }
+      : { ...this.props_, profilePhone: this.logic.state.profile?.phone || this.state.session?.phone || '' };
     const vals = { ...this.props_, ...(this.logic.renderVals() || {}) };
     if (!this.state.session) return <LoginPage themeStyle={vals.rootStyle} onLogin={this.handleLogin} />;
     if (appConfig.backendEnabled) {

@@ -96,7 +96,7 @@ func (s *Server) register(c *gin.Context) {
 		serverError(c, err)
 		return
 	}
-	s.startSession(c, id, http.StatusCreated, in.Username, in.Email, in.Name)
+	s.startSession(c, id, http.StatusCreated, in.Username, in.Email, in.Name, phone)
 }
 
 func (s *Server) login(c *gin.Context) {
@@ -106,9 +106,9 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 	username := strings.ToLower(strings.TrimSpace(in.Username))
-	var id, hash, name, status, email string
-	err := s.DB.QueryRow(c, `SELECT id::text, password_hash, name, status, email::text FROM users WHERE username = $1 AND deleted_at IS NULL`, username).
-		Scan(&id, &hash, &name, &status, &email)
+	var id, hash, name, status, email, phone string
+	err := s.DB.QueryRow(c, `SELECT id::text, password_hash, name, status, email::text, COALESCE(phone, '') FROM users WHERE username = $1 AND deleted_at IS NULL`, username).
+		Scan(&id, &hash, &name, &status, &email, &phone)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(in.Password))
 		fail(c, http.StatusUnauthorized, "invalid_credentials", "Username atau password salah.")
@@ -125,10 +125,10 @@ func (s *Server) login(c *gin.Context) {
 		fail(c, http.StatusForbidden, "account_suspended", "Akun ditangguhkan. Hubungi Convera.")
 		return
 	}
-	s.startSession(c, id, http.StatusOK, username, email, name)
+	s.startSession(c, id, http.StatusOK, username, email, name, phone)
 }
 
-func (s *Server) startSession(c *gin.Context, userID string, status int, username, email, name string) {
+func (s *Server) startSession(c *gin.Context, userID string, status int, username, email, name, phone string) {
 	token, err1 := secure.RandomToken(32)
 	csrf, err2 := secure.RandomToken(16)
 	if err1 != nil || err2 != nil {
@@ -147,7 +147,7 @@ func (s *Server) startSession(c *gin.Context, userID string, status int, usernam
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(sessionCookie, token, max, "/", s.Cfg.CookieDomain, s.Cfg.CookieSecure, true) // httpOnly
 	c.SetCookie(csrfCookie, csrf, max, "/", s.Cfg.CookieDomain, s.Cfg.CookieSecure, false)    // dibaca JS untuk X-CSRF-Token
-	okStatus(c, status, gin.H{"user": gin.H{"id": userID, "username": username, "email": email, "name": name}, "csrf_token": csrf})
+	okStatus(c, status, gin.H{"user": gin.H{"id": userID, "username": username, "email": email, "name": name, "phone": phone}, "csrf_token": csrf})
 }
 
 func (s *Server) logout(c *gin.Context) {
@@ -166,12 +166,12 @@ func (s *Server) logout(c *gin.Context) {
 }
 
 func (s *Server) session(c *gin.Context) {
-	var username, email, name string
-	if err := s.DB.QueryRow(c, `SELECT username::text, email::text, name FROM users WHERE id = $1`, c.GetString("user_id")).Scan(&username, &email, &name); err != nil {
+	var username, email, name, phone string
+	if err := s.DB.QueryRow(c, `SELECT username::text, email::text, name, COALESCE(phone, '') FROM users WHERE id = $1`, c.GetString("user_id")).Scan(&username, &email, &name, &phone); err != nil {
 		serverError(c, err)
 		return
 	}
-	out := gin.H{"user": gin.H{"id": c.GetString("user_id"), "username": username, "email": email, "name": name}}
+	out := gin.H{"user": gin.H{"id": c.GetString("user_id"), "username": username, "email": email, "name": name, "phone": phone}}
 	if isSupport(c) {
 		var slug, wsName string
 		var exp time.Time

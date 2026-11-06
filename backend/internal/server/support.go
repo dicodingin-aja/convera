@@ -75,15 +75,15 @@ func (s *Server) supportLogin(c *gin.Context) {
 		return
 	}
 	defer tx.Rollback(c)
-	var codeID, adminID, wsID, userID, reason, adminName, wsSlug, wsName, username, email, name string
+	var codeID, adminID, wsID, userID, reason, adminName, wsSlug, wsName, username, email, name, phone string
 	err = tx.QueryRow(c, `
-SELECT sc.id::text, sc.admin_id::text, sc.workspace_id::text, sc.user_id::text, sc.reason, a.name, w.slug, w.name, u.username::text, u.email::text, u.name
+SELECT sc.id::text, sc.admin_id::text, sc.workspace_id::text, sc.user_id::text, sc.reason, a.name, w.slug, w.name, u.username::text, u.email::text, u.name, COALESCE(u.phone, '')
 FROM support_access_codes sc
 JOIN admins a ON a.id = sc.admin_id AND a.status = 'active'
 JOIN workspaces w ON w.id = sc.workspace_id AND w.deleted_at IS NULL
 JOIN users u ON u.id = sc.user_id AND u.deleted_at IS NULL AND u.status = 'active'
 WHERE sc.token_hash = $1 AND sc.used_at IS NULL AND sc.expires_at > now() FOR UPDATE OF sc`, secure.HashToken(in.Code)).
-		Scan(&codeID, &adminID, &wsID, &userID, &reason, &adminName, &wsSlug, &wsName, &username, &email, &name)
+		Scan(&codeID, &adminID, &wsID, &userID, &reason, &adminName, &wsSlug, &wsName, &username, &email, &name, &phone)
 	if errors.Is(err, pgx.ErrNoRows) {
 		fail(c, http.StatusBadRequest, "invalid_code", "Tautan dukungan tidak valid, sudah dipakai, atau kedaluwarsa. Buat tautan baru dari Convera Admin.")
 		return
@@ -122,7 +122,7 @@ WHERE sc.token_hash = $1 AND sc.used_at IS NULL AND sc.expires_at > now() FOR UP
 	c.SetCookie(sessionCookie, tok, int(supportSessionTTL.Seconds()), "/", s.Cfg.CookieDomain, s.Cfg.CookieSecure, true)
 	c.SetCookie(csrfCookie, csrf, int(supportSessionTTL.Seconds()), "/", s.Cfg.CookieDomain, s.Cfg.CookieSecure, false)
 	ok(c, gin.H{
-		"user":       gin.H{"username": username, "email": email, "name": name},
+		"user":       gin.H{"username": username, "email": email, "name": name, "phone": phone},
 		"csrf_token": csrf,
 		"support":    gin.H{"admin": adminName, "workspace": wsSlug, "workspace_name": wsName, "expires_at": expires},
 	})

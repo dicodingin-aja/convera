@@ -25,7 +25,7 @@ export async function login(username, password) {
     if (password.length < 6) throw new Error('Password minimal 6 karakter');
     user = { username, name: username };
   }
-  const session = { username: user.username || username, email: user.email || '', name: user.name || username, at: new Date().toISOString() };
+  const session = { username: user.username || username, email: user.email || '', name: user.name || username, phone: user.phone || '', at: new Date().toISOString() };
   try { localStorage.setItem(KEY, JSON.stringify(session)); } catch {}
   return session;
 }
@@ -42,8 +42,8 @@ export async function register({ name, username, email, phone, password }) {
   if (!isPhone(phone)) throw new Error('Nomor telepon tidak valid');
   if (String(password).length < 8) throw new Error('Password minimal 8 karakter');
   const res = await requestJson(ENDPOINTS.register, { method: 'POST', body: JSON.stringify({ name, username, email, phone, password }) });
-  const user = res?.data?.user || { username, email, name };
-  const session = { username: user.username || username, email: user.email || email, name: user.name || name, at: new Date().toISOString() };
+  const user = res?.data?.user || { username, email, name, phone };
+  const session = { username: user.username || username, email: user.email || email, name: user.name || name, phone: user.phone || phone, at: new Date().toISOString() };
   try { localStorage.setItem(KEY, JSON.stringify(session)); } catch {}
   return session;
 }
@@ -54,7 +54,7 @@ export async function supportLogin(code) {
   const u = res?.data?.user || {};
   const sup = res?.data?.support || {};
   const session = {
-    username: u.username, email: u.email, name: u.name, at: new Date().toISOString(),
+    username: u.username, email: u.email, name: u.name, phone: u.phone || '', at: new Date().toISOString(),
     support: { admin: sup.admin, workspace: sup.workspace, workspaceName: sup.workspace_name, expiresAt: sup.expires_at },
   };
   try { localStorage.setItem(KEY, JSON.stringify(session)); } catch {}
