@@ -734,7 +734,7 @@ class Component extends DCLogic {
       ['wa', 'err', 'WhatsApp ' + waPhoneMasked + ' terputus.', 'Event dari nomor ini ditahan sampai terhubung lagi.', 'Hubungkan ulang', 'koneksi'],
       ['token', 'warn', 'Token Meta kedaluwarsa dalam 5 hari.', 'Event berhenti terkirim setelah 22 Okt.', 'Ganti token', 'koneksi'],
       ['trial', 'info', 'Trial Growth tersisa 9 hari.', 'Pilih paket agar fitur ROAS & Event tetap aktif.', 'Pilih paket', 'pengaturan'],
-    ].filter(([k]) => s.banners[k] && (k !== 'wa' || !waOn));
+    ].filter(([k]) => s.banners[k] && (k !== 'wa' || !waConnected));
     const bStyle = { err: ['var(--errBg)', 'var(--text)'], warn: ['var(--accentSoft)', 'var(--accentText)'], info: ['var(--neutral)', 'var(--text)'] };
     const banners = BAN.slice(0, 1).map(([k, t, title, body, cta, page]) => ({ title, body: '', cta, icon: t === 'info' ? ic.clock : ic.alert,
       act: () => this.setState({ page }), close: () => this.setState((st) => ({ banners: { ...st.banners, [k]: false } })),
