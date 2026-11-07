@@ -702,7 +702,7 @@ class Component extends DCLogic {
     const presets = PRE.map(([label, hint], i) => ({ label: i === 6 ? customLabel : label, hint: i === 6 ? '' : hint, pick: () => { if (i < 6) this.setState({ range: i, menu: null }); }, style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 8, border: 'none', cursor: i === 6 ? 'default' : 'pointer', textAlign: 'left', fontSize: 13, fontWeight: i === s.range ? 500 : 400, background: i === s.range ? 'var(--accentSoft)' : 'transparent', color: i === s.range ? 'var(--accentText)' : 'var(--text)' } }));
     // Mode backend: notifikasi nyata dari API; mode demo tetap memakai data contoh.
     const agoId = (iso) => { const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 1 ? 'Baru saja' : m < 60 ? m + ' mnt lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
-    const realNotifs = P.live ? ((P.notifs && P.notifs.items) || []).filter((n) => !(waOn && n.type === 'wa_disconnected')) : null;
+    const realNotifs = P.live ? ((P.notifs && P.notifs.items) || []).filter((n) => !(waConnected && n.type === 'wa_disconnected')) : null;
     // Notif trial: inject di posisi pertama jika status trial atau expired
     const trialNotif = (() => {
       const rs = P.realSub;
