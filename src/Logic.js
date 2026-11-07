@@ -12,9 +12,16 @@ const displayPhone = (phone) => {
   const digits = raw.replace(/\D/g, '');
   if (digits.startsWith('62') && !raw.includes('*')) {
     const local = digits.slice(2);
-    return '+62 ' + local.slice(0, 3) + '-' + local.slice(3, 7) + '-' + local.slice(7);
+    return '+62 ' + local.slice(0, 3) + '-••••-' + local.slice(-4);
   }
-  return raw.replace('****', '•••');
+  return raw.replace(/^62/, '+62 ').replace('****', '••••');
+};
+
+const liveWaConnected = (health, fallback) => {
+  if (!health) return fallback;
+  if (health.mode === 'qr' || health.qr_status != null) return health.qr_status === 'connected';
+  if (health.mode === 'waba') return health.configured === true;
+  return fallback;
 };
 
 class Component extends DCLogic {
@@ -130,7 +137,7 @@ class Component extends DCLogic {
     const SRCB = { display: 'inline-flex', alignItems: 'center', justifySelf: 'start', height: 24, padding: '0 8px', borderRadius: 6, background: 'var(--surface)', color: 'var(--text)', fontFamily: "'Poppins',monospace", fontSize: 11, fontWeight: 400 };
     const EVP = { Mengirim: 'warn', Terkirim: 'ok', Gagal: 'err', Duplikat: 'neutral', Retry: 'warn', Kedaluwarsa: 'neutral', Menunggu: 'warn' };
     const dotC = (k) => k === 'ok' ? (sem ? 'var(--okFg)' : 'var(--text)') : k === 'err' ? 'var(--errDotStrong)' : 'var(--accentText)';
-    const disc = s.disc || {}; const metaOn = !disc.meta, waOn = !!s.waOn && !disc.wa, adOn = LV ? !!(LV.perf && LV.perf.connected) : !disc.ad && s.ws !== 1;
+    const disc = s.disc || {}; const metaOn = !disc.meta, waOn = liveWaConnected(liveHealth, !!s.waOn && !disc.wa), adOn = LV ? !!(LV.perf && LV.perf.connected) : !disc.ad && s.ws !== 1;
     const tokenDays = s.tokenDays ?? 5;
 
     const ADS = LV ? LV.ads : [
@@ -568,7 +575,7 @@ class Component extends DCLogic {
     const liveHealth = P.live?.raw?.overview?.health || null;
     const waPhoneMasked = displayPhone(liveHealth?.wa_phone || liveHealth?.wa_phone_masked) || ownerPhoneMasked;
     const metaConnected = !s.disc?.meta && !!s.f?.dataset && !!s.f?.token;
-    const waConnected = !!s.waOn && !s.disc?.wa;
+    const waConnected = liveWaConnected(liveHealth, !!s.waOn && !s.disc?.wa);
     const healthIssues = [metaConnected, waConnected].filter((connected) => !connected).length;
     const healthSummary = healthIssues ? healthIssues + ' koneksi bermasalah' : 'Semua koneksi sehat';
     const healthMetaStatus = metaConnected ? 'Terhubung · token berlaku ' + (s.tokenDays ?? 0) + ' hari lagi' : 'Terputus · hubungkan Meta Dataset';
@@ -695,7 +702,7 @@ class Component extends DCLogic {
     const presets = PRE.map(([label, hint], i) => ({ label: i === 6 ? customLabel : label, hint: i === 6 ? '' : hint, pick: () => { if (i < 6) this.setState({ range: i, menu: null }); }, style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 8, border: 'none', cursor: i === 6 ? 'default' : 'pointer', textAlign: 'left', fontSize: 13, fontWeight: i === s.range ? 500 : 400, background: i === s.range ? 'var(--accentSoft)' : 'transparent', color: i === s.range ? 'var(--accentText)' : 'var(--text)' } }));
     // Mode backend: notifikasi nyata dari API; mode demo tetap memakai data contoh.
     const agoId = (iso) => { const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 1 ? 'Baru saja' : m < 60 ? m + ' mnt lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
-    const realNotifs = P.live ? ((P.notifs && P.notifs.items) || []) : null;
+    const realNotifs = P.live ? ((P.notifs && P.notifs.items) || []).filter((n) => !(waOn && n.type === 'wa_disconnected')) : null;
     // Notif trial: inject di posisi pertama jika status trial atau expired
     const trialNotif = (() => {
       const rs = P.realSub;
@@ -727,7 +734,7 @@ class Component extends DCLogic {
       ['wa', 'err', 'WhatsApp ' + waPhoneMasked + ' terputus.', 'Event dari nomor ini ditahan sampai terhubung lagi.', 'Hubungkan ulang', 'koneksi'],
       ['token', 'warn', 'Token Meta kedaluwarsa dalam 5 hari.', 'Event berhenti terkirim setelah 22 Okt.', 'Ganti token', 'koneksi'],
       ['trial', 'info', 'Trial Growth tersisa 9 hari.', 'Pilih paket agar fitur ROAS & Event tetap aktif.', 'Pilih paket', 'pengaturan'],
-    ].filter(([k]) => s.banners[k]);
+    ].filter(([k]) => s.banners[k] && (k !== 'wa' || !waOn));
     const bStyle = { err: ['var(--errBg)', 'var(--text)'], warn: ['var(--accentSoft)', 'var(--accentText)'], info: ['var(--neutral)', 'var(--text)'] };
     const banners = BAN.slice(0, 1).map(([k, t, title, body, cta, page]) => ({ title, body: '', cta, icon: t === 'info' ? ic.clock : ic.alert,
       act: () => this.setState({ page }), close: () => this.setState((st) => ({ banners: { ...st.banners, [k]: false } })),
