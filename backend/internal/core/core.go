@@ -313,14 +313,6 @@ ON CONFLICT (provider, message_id) DO NOTHING`, workspaceID, m.Provider, m.ID, m
 		return false, err
 	}
 
-	// Isi pesan disimpan agar pelanggan bisa melihat percakapan lead-nya (dihapus otomatis oleh job retensi).
-	if body := truncRunes(strings.TrimSpace(m.Text), 4000); body != "" {
-		if _, err := tx.Exec(ctx, `INSERT INTO lead_messages (workspace_id, lead_id, direction, body, sent_at) VALUES ($1,$2,$3,$4,$5)`,
-			workspaceID, leadID, m.Direction, body, m.At); err != nil {
-			return false, err
-		}
-	}
-
 	who := "customer"
 	if m.Direction == "out" {
 		who = "admin"
@@ -333,10 +325,12 @@ ON CONFLICT (provider, message_id) DO NOTHING`, workspaceID, m.Provider, m.ID, m
 		return false, err
 	}
 	var problems []string
+	triggered := false
 	for _, r := range rules {
 		if !r.Matches(who, m.Text) {
 			continue
 		}
+		triggered = true
 		val, need := r.Value(m.Text)
 		out, cerr := CreateConversion(ctx, tx, Params{
 			WorkspaceID: workspaceID, LeadID: leadID, EventName: r.EventName, Value: val,
@@ -354,6 +348,14 @@ ON CONFLICT (provider, message_id) DO NOTHING`, workspaceID, m.Provider, m.ID, m
 			if _, err := tx.Exec(ctx, `UPDATE event_rules SET hit_count = hit_count + 1, last_hit_at = now() WHERE id = $1`, r.ID); err != nil {
 				return false, err
 			}
+		}
+	}
+	// Hanya pesan yang memicu event (cocok dengan aturan) yang disimpan sebagai bubble chat di detail lead;
+	// obrolan biasa tidak disimpan. Dihapus otomatis oleh job retensi.
+	if body := truncRunes(strings.TrimSpace(m.Text), 4000); triggered && body != "" {
+		if _, err := tx.Exec(ctx, `INSERT INTO lead_messages (workspace_id, lead_id, direction, body, sent_at) VALUES ($1,$2,$3,$4,$5)`,
+			workspaceID, leadID, m.Direction, body, m.At); err != nil {
+			return false, err
 		}
 	}
 	_, err = tx.Exec(ctx, `UPDATE webhook_inbox SET processed_at = now(), error = NULLIF($3,'')

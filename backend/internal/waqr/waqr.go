@@ -76,7 +76,12 @@ func (m *Manager) Resume(ctx context.Context) {
 	rows.Close()
 	for _, id := range ids {
 		if _, err := m.open(ctx, id, false); err != nil {
+			// Perangkat hilang/rusak: jangan biarkan dashboard menampilkan "Terhubung" palsu.
 			log.Printf("waqr resume %s: %v", id, err)
+			if strings.Contains(err.Error(), "belum tertaut") { // perangkat sudah tidak ada di penyimpanan
+				_, _ = m.DB.Exec(ctx, `UPDATE wa_sessions SET device_jid = NULL WHERE workspace_id::text = $1`, id)
+			}
+			m.report(id, "disconnected", "")
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
@@ -254,6 +259,12 @@ func (m *Manager) Delete(ctx context.Context, ws string) error {
 // ---------- Event WhatsApp ----------
 
 func (m *Manager) handle(s *session, evt any) {
+	// Satu workspace bermasalah tidak boleh menjatuhkan sesi workspace lain: tangkap panic per event.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("waqr ws=%s: panic di handler event: %v", s.ws, r)
+		}
+	}()
 	switch e := evt.(type) {
 	case *events.PairSuccess:
 		_, _ = m.DB.Exec(m.ctx, `UPDATE wa_sessions SET device_jid = $2 WHERE workspace_id::text = $1`, s.ws, e.ID.String())
@@ -265,14 +276,36 @@ func (m *Manager) handle(s *session, evt any) {
 		// Pastikan JID tersimpan (juga untuk sesi hasil pemulihan).
 		_, _ = m.DB.Exec(m.ctx, `UPDATE wa_sessions SET device_jid = $2 WHERE workspace_id::text = $1`, s.ws, s.client.Store.ID.String())
 		m.report(s.ws, "connected", s.client.Store.ID.User)
-	case *events.LoggedOut: // dicabut dari ponsel (Perangkat tertaut -> Keluar)
-		s.set("", "disconnected")
-		_, _ = m.DB.Exec(m.ctx, `UPDATE wa_sessions SET device_jid = NULL WHERE workspace_id::text = $1`, s.ws)
-		m.report(s.ws, "disconnected", "")
-		go m.forget(s.ws, s)
+	case *events.LoggedOut: // dicabut dari ponsel (Perangkat tertaut -> Keluar), juga terdeteksi saat menyambung ulang
+		log.Printf("waqr ws=%s: dicabut dari ponsel (on_connect=%v reason=%v)", s.ws, e.OnConnect, e.Reason)
+		m.lost(s, true)
+	case *events.StreamReplaced: // sesi yang sama dibuka di tempat lain; perangkat masih sah, bisa disambung ulang
+		log.Printf("waqr ws=%s: sesi digantikan koneksi lain", s.ws)
+		m.lost(s, false)
+	case *events.TemporaryBan:
+		log.Printf("waqr ws=%s: dibatasi sementara oleh WhatsApp: %v", s.ws, e)
+		m.lost(s, false)
+	case *events.ClientOutdated:
+		log.Printf("waqr ws=%s: versi klien WhatsApp usang, perlu memperbarui library", s.ws)
+		m.lost(s, false)
+	case *events.ConnectFailure:
+		// Alasan 401/403 (sesi dicabut) sudah diikuti event LoggedOut oleh library; selainnya bisa dicoba lagi otomatis.
+		log.Printf("waqr ws=%s: gagal menyambung (reason=%v)", s.ws, e.Reason)
 	case *events.Message:
 		m.onMessage(s, e)
 	}
+}
+
+// lost menandai sesi workspace ini terputus, memberi tahu API (status + notifikasi), dan melepas klien dari memori.
+// revoke=true: tautan perangkat sudah tidak sah (dicabut dari ponsel) sehingga JID dibuang dan perlu scan QR ulang.
+func (m *Manager) lost(s *session, revoke bool) {
+	s.set("", "disconnected")
+	if revoke {
+		_, _ = m.DB.Exec(m.ctx, `UPDATE wa_sessions SET device_jid = NULL WHERE workspace_id::text = $1`, s.ws)
+	}
+	// Status 'disconnected' ditulis oleh API (qrStatusUpdate) agar notifikasi "Sesi WhatsApp terputus" ikut terkirim.
+	m.report(s.ws, "disconnected", "")
+	go m.forget(s.ws, s)
 }
 
 // phoneOf menentukan nomor telepon lawan bicara; WhatsApp kini sering memakai alamat LID sehingga perlu dipetakan.

@@ -75,6 +75,20 @@ function QrSection({ slug, wa, onChanged }) {
   );
 }
 
+// Mode QR: sesi pernah tertaut tetapi terputus (dicabut dari ponsel, kedaluwarsa, atau layanan sesi berhenti).
+function QrLostSection({ onReconnect }) {
+  return (
+    <section style={{ ...card, boxShadow: 'inset 0 0 0 1.5px var(--danger)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <h2 style={h2}>WhatsApp</h2>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--danger)' }}>Terputus</span>
+      </div>
+      <span style={hintStyle}>Koneksi WhatsApp ke Convera terputus (mis. perangkat tertaut dihapus dari ponsel). Chat baru tidak tercatat sampai Anda scan QR lagi.</span>
+      <div><button type="button" onClick={onReconnect} style={{ ...btn, background: 'var(--accent)', color: '#fff' }}>Hubungkan ulang (scan QR)</button></div>
+    </section>
+  );
+}
+
 const EMPTY = { mode: 'waba', pixelId: '', token: '', testCode: '', wabaId: '', phoneNumberId: '', appSecret: '' };
 
 export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
@@ -103,6 +117,13 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
     })();
     return () => { alive = false; };
   }, [workspace.name]);
+
+  // Status WhatsApp dicek berkala agar pemutusan dari ponsel langsung terlihat tanpa memuat ulang halaman.
+  useEffect(() => {
+    if (!slug) return undefined;
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') loadWa(slug); }, 15000);
+    return () => window.clearInterval(t);
+  }, [slug]);
 
   const set = (k) => (e) => { setF((v) => ({ ...v, [k]: e.target.value })); setMsg(null); };
   const isWaba = f.mode === 'waba';
@@ -203,7 +224,8 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
           </details>
         </section>
       ) : (
-        wa && wa.status === 'connected' ? <QrSection slug={slug} wa={wa} onChanged={() => loadWa()} /> : null
+        wa && wa.status === 'connected' ? <QrSection slug={slug} wa={wa} onChanged={() => loadWa()} />
+          : wa && wa.status === 'disconnected' && wa.phone_masked ? <QrLostSection onReconnect={onScanQr} /> : null
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>

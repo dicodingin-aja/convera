@@ -28,7 +28,7 @@ export default function Ringkasan() {
       <div className="grid g3">
         <Kpi label="Pendapatan bulan ini" icon="wallet" value={rp(kpi.revenue_month)} sub={'Proyeksi akhir ' + monthShort(now) + ' ' + rp(kpi.projected_month)} />
         <Kpi label="MRR" icon="trend" value={rp(kpi.mrr)} sub="Pendapatan bulanan berulang" />
-        <Kpi label="Customer berlangganan" icon="users" value={`${kpi.active} / ${kpi.total}`} sub={`${kpi.trial} trial · ${kpi.expired} tidak berlangganan`} />
+        <Kpi label="Customer berlangganan" icon="users" value={`${kpi.active} / ${kpi.total}`} sub={`${kpi.trial} trial · ${kpi.expired} tidak berlangganan` + (kpi.multi_trial_accounts > 0 ? ` · ⚠ ${kpi.multi_trial_accounts} akun trial >1 workspace` : '')} />
         <Kpi label="Online sekarang" icon="wifi" value={kpi.online} sub="Aktif dalam 5 menit terakhir" />
       </div>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>

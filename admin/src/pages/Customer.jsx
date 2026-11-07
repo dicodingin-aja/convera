@@ -147,7 +147,7 @@ export default function Customer() {
             <tbody>
               {rows.map((c, i) => { const [label, tone] = statusInfo(c); const [d1, d2, warn] = untilInfo(c); return (
                 <tr key={c.id} className="click" onClick={() => setSel(c.id)}>
-                  <td><div className="row nowrap"><Av name={c.name} i={i} /><div><b style={{ fontWeight: 600 }}>{c.name}</b><div className="muted sm">{c.owner} · @{c.username} · {c.city || '—'}</div></div></div></td>
+                  <td><div className="row nowrap"><Av name={c.name} i={i} /><div><b style={{ fontWeight: 600 }}>{c.name}</b><div className="muted sm">{c.owner} · @{c.username} · {c.city || '—'}</div>{c.owner_ws_count > 1 ? <div className="sm" style={{ color: c.owner_trial_count > 1 ? 'var(--danger, #c0392b)' : 'var(--muted)', fontWeight: c.owner_trial_count > 1 ? 600 : 400 }}>{c.owner_ws_count} workspace · {c.owner_trial_count} pernah trial{c.owner_trial_count > 1 ? ' — melanggar batas 1 trial/akun' : ''}</div> : null}</div></div></td>
                   <td>{c.plan_name || '—'}</td>
                   <td><Pill tone={tone}>{label}</Pill></td>
                   <td><span className="row nowrap"><span className={'dot' + (c.online ? ' on' : '')} /><span style={{ color: c.online ? 'var(--accentText)' : 'var(--muted)', fontWeight: c.online ? 500 : 400 }}>{lastSeenText(c)}</span></span></td>

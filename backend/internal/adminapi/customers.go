@@ -30,7 +30,9 @@ const customerCols = `w.id::text AS id, w.slug, w.name, u.name AS owner, w.city,
   eff.status AS status, p.code AS plan, p.name AS plan_name, p.price_month::float8 AS plan_price,
   CASE WHEN eff.status IN ('active', 'expired', 'stopped') THEN sub.current_period_end END AS until,
   sub.trial_until, sp.name AS sales, u.last_seen_at,
-  COALESCE(u.last_seen_at > now() - interval '5 minutes', false) AS online, w.created_at`
+  COALESCE(u.last_seen_at > now() - interval '5 minutes', false) AS online, w.created_at,
+  (SELECT count(*) FROM workspaces x WHERE x.owner_user_id = u.id AND x.deleted_at IS NULL) AS owner_ws_count,
+  (SELECT count(*) FROM subscriptions sb JOIN workspaces x ON x.id = sb.workspace_id WHERE x.owner_user_id = u.id AND sb.trial_until IS NOT NULL) AS owner_trial_count`
 
 // ---------- Ringkasan ----------
 
@@ -41,6 +43,7 @@ SELECT count(*) AS total,
   count(*) FILTER (WHERE eff.status = 'trial') AS trial,
   count(*) FILTER (WHERE eff.status IN ('expired', 'stopped')) AS expired,
   count(*) FILTER (WHERE eff.status = 'pending') AS pending,
+  count(DISTINCT u.id) FILTER (WHERE (SELECT count(*) FROM subscriptions sb JOIN workspaces x ON x.id = sb.workspace_id WHERE x.owner_user_id = u.id AND sb.trial_until IS NOT NULL) > 1) AS multi_trial_accounts,
   count(*) FILTER (WHERE u.last_seen_at > now() - interval '5 minutes') AS online,
   COALESCE(sum(p.price_month) FILTER (WHERE eff.status = 'active'), 0)::float8 AS mrr,
   COALESCE(sum(p.price_month) FILTER (WHERE eff.status = 'active' AND sub.current_period_end IS NOT NULL

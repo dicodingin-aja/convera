@@ -17,6 +17,8 @@ import { getSession, logout, initials, clearLocalSession } from './services/auth
 import { getSub, subInfo, activate } from './plans.js';
 import KoneksiSettings, { CONN_DEFAULT } from './KoneksiSettings.jsx';
 
+const IDLE_LIMIT_MS = 30 * 60 * 1000;
+
 // Host: owns the design's logic instance (state, timers, handlers) and renders the template with its values.
 export default class App extends React.Component {
   constructor(props) {
@@ -84,6 +86,7 @@ export default class App extends React.Component {
       const current = JSON.parse(localStorage.getItem('convera:auth') || '{}');
       localStorage.setItem('convera:auth', JSON.stringify({ ...current, ...session, phone: profile.phone }));
     } catch {}
+    this._lastTouch = 0; this.touchActivity();
     this.setState({ session, workspaces: null });
     this.loadWorkspaces(session);
   };
@@ -225,9 +228,38 @@ export default class App extends React.Component {
   };
   liveDeleteRule = (id) => this.liveAction(() => liveApi.deleteRule(this._activeWsSlug, id));
 
+  // Auto-logout bila tidak ada aktivitas pengguna selama 30 menit. Hanya sesi login di browser ini yang berakhir;
+  // proses di server (sesi WhatsApp, pengiriman event ke Meta) tetap berjalan. Aktivitas dibagi antar-tab lewat localStorage.
+  _idleKey = 'convera:lastActive';
+  touchActivity = () => {
+    const now = Date.now();
+    if (now - (this._lastTouch || 0) < 5000) return; // batasi tulis
+    this._lastTouch = now;
+    try { localStorage.setItem(this._idleKey, String(now)); } catch { /* abaikan */ }
+  };
+  checkIdle = () => {
+    if (!this.state.session || this.state.session.support) return; // sesi dukungan punya batas waktu sendiri
+    let last = 0;
+    try { last = Number(localStorage.getItem(this._idleKey)) || 0; } catch { /* abaikan */ }
+    if (!last) { this.touchActivity(); return; }
+    if (Date.now() - last >= IDLE_LIMIT_MS) this.idleLogout();
+  };
+  idleLogout = async () => {
+    try { sessionStorage.setItem('convera:notice', 'Anda keluar otomatis karena tidak ada aktivitas selama 30 menit. Silakan masuk lagi.'); } catch { /* abaikan */ }
+    try { await logout(); } catch { /* tetap keluar di sisi browser */ }
+    try { localStorage.removeItem(this._idleKey); } catch { /* abaikan */ }
+    this.setState({ session: null, route: null, plansFor: null, workspaces: null, realSub: null, live: null });
+  };
+
   componentDidMount() {
     this.logic.componentDidMount();
     window.addEventListener('convera:unauthorized', this.handleUnauthorized);
+    this._idleEvents = ['mousedown', 'keydown', 'touchstart', 'scroll', 'wheel', 'click'];
+    this._idleEvents.forEach((e) => window.addEventListener(e, this.touchActivity, { passive: true, capture: true }));
+    document.addEventListener('visibilitychange', this.checkIdle);
+    this._idleTimer = setInterval(this.checkIdle, 30000);
+    this.checkIdle(); // tab dibuka lagi setelah >30 menit tanpa aktivitas: langsung keluar
+    this._lastTouch = 0; this.touchActivity();
     this.loadWorkspaces();
     this._liveTimer = setInterval(() => { if (document.visibilityState === 'visible') { this.refreshLive(); this.refreshNotifs(); } }, 30000);
   }
@@ -248,7 +280,7 @@ export default class App extends React.Component {
       this.loadRealSub();
     }
   }
-  componentWillUnmount() { this.logic.componentWillUnmount(); window.removeEventListener('convera:unauthorized', this.handleUnauthorized); clearInterval(this._liveTimer); }
+  componentWillUnmount() { this.logic.componentWillUnmount(); window.removeEventListener('convera:unauthorized', this.handleUnauthorized); clearInterval(this._liveTimer); clearInterval(this._idleTimer); (this._idleEvents || []).forEach((e) => window.removeEventListener(e, this.touchActivity, true)); document.removeEventListener('visibilitychange', this.checkIdle); }
   render() {
     this.logic.props = appConfig.backendEnabled && this.state.workspaces
       ? { ...this.props_, backendEnabled: true, workspaces: this.state.workspaces, activeWorkspace: this.state.workspaces[this.logic.state.ws], security: this.state.security, live: this.state.live || emptyLive(this.logic.state.range ?? 2), notifs: this.state.notifs || { items: [], unread: 0 }, readAllNotifs: this.readAllNotifs, saveWorkspaceSettings: this.saveWorkspaceSettings, changeSecurityPassword: this.saveSecurityPassword, revokeSecuritySession: this.revokeSecuritySession, profileName: this.logic.state.profile?.name || this.state.session.name || '', profileEmail: this.logic.state.profile?.email || this.state.session.email || '', profilePhone: this.logic.state.profile?.phone || this.state.session.phone || '', realSub: this.state.realSub }

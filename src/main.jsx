@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import ErrorBoundary from './ErrorBoundary.jsx';
 import { appConfig } from './services/config.js';
 import { takeParam } from './services/links.js';
 import { supportLogin } from './services/auth.js';
@@ -15,7 +16,7 @@ import './styles.css';
 // Tautan khusus (mode backend), token dihapus dari URL begitu dibaca:
 //   ?support=<kode>   sesi dukungan dari Convera Admin (admin membantu customer; kode sekali pakai)
 const notice = (m) => { try { sessionStorage.setItem('convera:notice', m); } catch { /* abaikan */ } };
-const start = () => createRoot(document.getElementById('root')).render(<App />);
+const start = () => createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
 
 if (appConfig.backendEnabled) {
   const support = takeParam('support');

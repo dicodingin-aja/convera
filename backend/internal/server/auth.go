@@ -431,8 +431,22 @@ func (s *Server) createWorkspaceTx(ctx context.Context, userID, slug, name, cate
 		VALUES ($1,$2,$3,NULLIF($4,''),NULLIF($5,'')) RETURNING id::text`, userID, slug, name, category, city).Scan(id); err != nil {
 		return err
 	}
-	// Langganan trial: trial_until = sekarang + settings.trial_days (default 14).
-	if _, err := tx.Exec(ctx, `
+	// Trial hanya untuk 1 workspace per akun (workspace pertama). Workspace berikutnya, juga yang dibuat setelah
+	// workspace pertama dihapus, mulai 'expired' dan wajib bayar dulu. Baris user dikunci agar dua permintaan
+	// bersamaan tidak sama-sama mendapat trial.
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, userID); err != nil {
+		return err
+	}
+	var hadTrial bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM subscriptions sb JOIN workspaces x ON x.id = sb.workspace_id
+		WHERE x.owner_user_id = $1 AND sb.workspace_id <> $2 AND sb.trial_until IS NOT NULL)`, userID, *id).Scan(&hadTrial); err != nil {
+		return err
+	}
+	if hadTrial {
+		if _, err := tx.Exec(ctx, `INSERT INTO subscriptions (workspace_id, status) VALUES ($1, 'expired')`, *id); err != nil {
+			return err
+		}
+	} else if _, err := tx.Exec(ctx, `
 INSERT INTO subscriptions (workspace_id, status, trial_until)
 VALUES ($1, 'trial', now() + make_interval(days => COALESCE((SELECT (value #>> '{}')::int FROM settings WHERE key = 'trial_days'), 14)))`, *id); err != nil {
 		return err

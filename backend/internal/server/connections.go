@@ -368,7 +368,7 @@ func (s *Server) qrDisconnect(c *gin.Context) {
 		serverError(c, err)
 		return
 	}
-	_, _ = s.DB.Exec(c, `UPDATE wa_sessions SET status='disconnected', session_data_enc=NULL WHERE workspace_id=$1`, wsID(c))
+	_, _ = s.DB.Exec(c, `UPDATE wa_sessions SET status='disconnected', session_data_enc=NULL, phone_masked=NULL, phone_enc=NULL WHERE workspace_id=$1`, wsID(c))
 	ok(c, gin.H{"status": "disconnected"})
 }
 
