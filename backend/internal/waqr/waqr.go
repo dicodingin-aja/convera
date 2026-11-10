@@ -291,6 +291,10 @@ func (m *Manager) handle(s *session, evt any) {
 	case *events.ConnectFailure:
 		// Alasan 401/403 (sesi dicabut) sudah diikuti event LoggedOut oleh library; selainnya bisa dicoba lagi otomatis.
 		log.Printf("waqr ws=%s: gagal menyambung (reason=%v)", s.ws, e.Reason)
+		// Jangan biarkan dashboard menampilkan "Terhubung" ketika reconnect sedang berlangsung.
+		// Client tetap dipertahankan agar EnableAutoReconnect dapat memulihkan sesi.
+		s.set("", "disconnected")
+		m.report(s.ws, "disconnected", "")
 	case *events.Message:
 		m.onMessage(s, e)
 	}

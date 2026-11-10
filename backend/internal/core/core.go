@@ -304,15 +304,6 @@ ON CONFLICT (provider, message_id) DO NOTHING`, workspaceID, m.Provider, m.ID, m
 		return false, nil // sudah pernah diproses
 	}
 
-	leadID, err := UpsertLead(ctx, tx, LeadInput{
-		WorkspaceID: workspaceID, Phone: m.Contact, Name: m.Name, PushName: m.PushName,
-		CtwaClid: m.CtwaClid, AdID: m.AdID, Headline: m.Headline, SourceURL: m.SourceURL,
-		Source: m.LeadSource, MessageAt: m.At, ClickedAt: m.At,
-	})
-	if err != nil {
-		return false, err
-	}
-
 	who := "customer"
 	if m.Direction == "out" {
 		who = "admin"
@@ -324,12 +315,30 @@ ON CONFLICT (provider, message_id) DO NOTHING`, workspaceID, m.Provider, m.ID, m
 	if err != nil {
 		return false, err
 	}
+	matches := make([]Rule, 0, len(rules))
+	for _, r := range rules {
+		if r.Matches(who, m.Text) {
+			matches = append(matches, r)
+		}
+	}
+	if len(matches) == 0 {
+		// Pesan tanpa trigger tidak membuat lead, event, atau salinan isi pesan.
+		_, err = tx.Exec(ctx, `UPDATE webhook_inbox SET processed_at = now(), error = NULL
+		                       WHERE provider = $1 AND message_id = $2`, m.Provider, m.ID)
+		return true, err
+	}
+
+	leadID, err := UpsertLead(ctx, tx, LeadInput{
+		WorkspaceID: workspaceID, Phone: m.Contact, Name: m.Name, PushName: m.PushName,
+		CtwaClid: m.CtwaClid, AdID: m.AdID, Headline: m.Headline, SourceURL: m.SourceURL,
+		Source: m.LeadSource, MessageAt: m.At, ClickedAt: m.At,
+	})
+	if err != nil {
+		return false, err
+	}
 	var problems []string
 	triggered := false
-	for _, r := range rules {
-		if !r.Matches(who, m.Text) {
-			continue
-		}
+	for _, r := range matches {
 		triggered = true
 		val, need := r.Value(m.Text)
 		out, cerr := CreateConversion(ctx, tx, Params{
