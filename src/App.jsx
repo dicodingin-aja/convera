@@ -101,11 +101,6 @@ export default class App extends React.Component {
   handleUnauthorized = () => {
     if (!this.state.session) return;
     const support = this.state.session.support;
-    const maint = this.state.maint?.on ? (
-      <div role="status" style={{ ...vals.rootStyle, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 16px', background: '#b4440f', color: '#fff', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
-        <span>Maintenance Ongoing{this.state.maint.message ? ' · ' + this.state.maint.message : ''}</span>
-      </div>
-    ) : null;
     clearLocalSession();
     try { sessionStorage.setItem('convera:notice', support ? 'Sesi dukungan berakhir.' : 'Sesi berakhir. Silakan masuk lagi.'); } catch { /* abaikan */ }
     this.setState({ session: null, route: null, plansFor: null, workspaces: null, realSub: null, live: null });
@@ -362,6 +357,11 @@ export default class App extends React.Component {
       <PlansModal themeStyle={vals.rootStyle} workspace={vals.wsAll[plansFor].name} renew={subInfo(getSub(st.subs, plansFor)).active} onPick={this.pickPlan} onClose={() => this.setState({ plansFor: null })} />
     ) : null;
     const support = this.state.session.support;
+    const maint = this.state.maint?.on ? (
+      <div role="status" style={{ ...vals.rootStyle, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 16px', background: '#b4440f', color: '#fff', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+        <span>Maintenance Ongoing{this.state.maint.message ? ' · ' + this.state.maint.message : ''}</span>
+      </div>
+    ) : null;
     const banner = support ? (
       <div role="status" style={{ ...vals.rootStyle, position: 'fixed', top: 0, left: 0, right: 0, zIndex: 300, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, flexWrap: 'wrap', padding: '6px 12px', background: '#b4440f', color: '#fff', fontSize: 13, fontWeight: 600 }}>
         <span>Mode dukungan · {support.workspaceName} · admin {support.admin} · berakhir {support.expiresAt ? new Date(support.expiresAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—'} · tindakan Anda dicatat</span>
