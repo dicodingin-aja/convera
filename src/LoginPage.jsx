@@ -31,7 +31,7 @@ export default function LoginPage({ themeStyle, onLogin }) {
     <div style={{ ...themeStyle, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'var(--bg)', color: 'var(--text)' }}>
       <form onSubmit={submit} style={{ width: 'min(400px, 100%)', background: 'var(--surface)', borderRadius: 16, padding: 32, display: 'flex', flexDirection: 'column', gap: 18, boxShadow: '0 20px 50px -25px rgba(0,0,0,.35)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <svg width="30" height="30" viewBox="0 0 32 32"><path d="M8 3h16a5 5 0 0 1 5 5v11a5 5 0 0 1-5 5h-9l-6.5 5.2a.6.6 0 0 1-1-.5V24H8a5 5 0 0 1-5-5V8a5 5 0 0 1 5-5z" fill="var(--accent)" /><path d="M9.5 18.5l4.5-4.5 3 3 5.5-5.5M18.5 11.5h4v4" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <img src="/convera-simbol.png" width="30" height="30" alt="Convera" style={{ display: "block", flex: "none" }} />
           <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.035em' }}>Convera</span>
         </div>
         <div>

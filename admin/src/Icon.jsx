@@ -35,8 +35,5 @@ export const Icon = ({ name, size = 20 }) => (
 );
 
 export const Logo = ({ size = 28 }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-    <path d="M8 3h16a5 5 0 0 1 5 5v11a5 5 0 0 1-5 5h-9l-6.5 5.2a.6.6 0 0 1-1-.5V24H8a5 5 0 0 1-5-5V8a5 5 0 0 1 5-5z" fill="var(--accent)" />
-    <path d="M9.5 18.5l4.5-4.5 3 3 5.5-5.5M18.5 11.5h4v4" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
+  <img src="/convera-simbol.png" width={size} height={size} alt="Convera" style={{ display: 'block', flex: 'none' }} />
 );

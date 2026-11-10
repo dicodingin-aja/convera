@@ -137,6 +137,13 @@ func (s *Server) uploadProof(c *gin.Context) {
 		key, mime, size = k, kind.Mime, sz
 	}
 
+	// Bank dan nama pengirim opsional (admin mencocokkan lewat nominal dan bukti); kolom DB wajib terisi, jadi pakai "-".
+	for _, k := range []string{"bank", "sender"} {
+		if strings.TrimSpace(fields[k]) == "" {
+			fields[k] = "-"
+		}
+	}
+
 	// ----- validasi isian -----
 	months, _ := strconv.Atoi(fields["months"])
 	var declared *float64
@@ -156,10 +163,10 @@ func (s *Server) uploadProof(c *gin.Context) {
 		msg = "Pilih paket."
 	case !billing.ValidMonths(months):
 		msg = "Periode harus 1, 3, atau 12 bulan."
-	case fields["bank"] == "" || len(fields["bank"]) > 40:
-		msg = "Bank pengirim wajib diisi (maks. 40 karakter)."
-	case fields["sender"] == "" || len(fields["sender"]) > 120:
-		msg = "Nama pemilik rekening pengirim wajib diisi (maks. 120 karakter)."
+	case len(fields["bank"]) > 40:
+		msg = "Bank pengirim maksimal 40 karakter."
+	case len(fields["sender"]) > 120:
+		msg = "Nama pemilik rekening pengirim maksimal 120 karakter."
 	case len(fields["ref"]) > 60:
 		msg = "Nomor referensi maksimal 60 karakter."
 	case len(fields["message"]) > 1000:
