@@ -108,12 +108,10 @@ class Component extends DCLogic {
 
   pagesVals(s, P, ic, W, mobile, WS) {
     const set = (o) => this.setState(o);
-    const ownerPhone = P.profilePhone ? normPhone(P.profilePhone) : '';
-    const ownerPhoneMasked = ownerPhone ? ownerPhone.slice(0, 4) + '-•••-' + ownerPhone.slice(-4) : 'nomor belum diisi';
     // Mode backend: P.live berisi data nyata dari API (leads, event, aturan, overview). Tanpa itu, data contoh dipakai.
     const LV = P.live || null;
     const liveHealth = LV?.raw?.overview?.health || null;
-    const waPhoneMasked = displayPhone(liveHealth?.wa_phone || liveHealth?.wa_phone_masked) || ownerPhoneMasked;
+    const waPhoneMasked = displayPhone(liveHealth?.wa_phone || liveHealth?.wa_phone_masked);
     const sem = P.statusStyle === 'semantic';
     const fmt = (n) => Math.round(n).toLocaleString('id-ID');
     const rp = (n) => 'Rp ' + fmt(n);
@@ -430,7 +428,7 @@ class Component extends DCLogic {
         { icon: ic.meta, title: 'Meta Dataset', sub: 'Kopi Senja – WhatsApp · 1029384756102938', status: metaOn ? 'Terhubung' : 'Terputus', pill: stP(metaOn), emq: metaOn, alert: metaOn ? '' : 'Event baru tidak dikirim ke Meta sampai Dataset dihubungkan lagi.',
           rows: metaOn ? [kRow('Event diterima 7 hari', '1.204'), kRow('Masa berlaku token', tokenDays + ' hari lagi', tokenDays < 14), kRow('Test event code', 'TEST48213')] : [kRow('Terakhir aktif', '17 Okt, 14:40')],
           actions: metaOn ? [A('Ganti token', () => set({ tokModal: true, tokVal: '' }), 'p'), A('Tes koneksi', async () => { say('Menguji koneksi Meta…'); const r = await testConnection({ datasetId: s.f.dataset, token: s.f.token }); say(r.ok ? 'Koneksi Meta OK' : 'Meta menolak koneksi', r.ok ? (r.demo ? 'Mode demo · Dataset ID & token valid' : r.name) : r.error); }), A('Putuskan', () => cfOpen('meta'), 'd')] : [A('Hubungkan', () => { set({ disc: { ...disc, meta: false } }); say('Meta Dataset terhubung'); }, 'p')] },
-        { icon: ic.chat, title: 'WhatsApp', sub: waPhoneMasked + ' · Cloud API', status: waOn ? 'Terhubung' : 'Terputus', pill: stP(waOn), emq: false, alert: waOn ? '' : 'Terputus sejak 12:31. 12 event ditahan dan akan dikirim otomatis setelah terhubung. Biasanya karena token System User dicabut.',
+        { icon: ic.chat, title: 'WhatsApp', sub: waPhoneMasked ? waPhoneMasked + ' · Cloud API' : 'Belum ada nomor terhubung · Cloud API', status: waOn ? 'Terhubung' : 'Terputus', pill: stP(waOn), emq: false, alert: waOn ? '' : 'Terputus sejak 12:31. 12 event ditahan dan akan dikirim otomatis setelah terhubung. Biasanya karena token System User dicabut.',
           rows: [kRow('Mode', 'Cloud API (resmi)'), kRow('Terakhir aktif', waOn ? 'Baru saja' : '17 Okt, 12:31', !waOn), kRow('Lead hari ini', '37'), kRow('Webhook ctwa_clid', waOn ? 'Aktif' : 'Tertunda', !waOn)],
           actions: waOn ? [A('Tambah nomor', () => set({ screen: 'onboarding', step: 2 })), A('Putuskan', () => cfOpen('wa'), 'd')] : [A('Hubungkan ulang', () => { set({ waOn: true, disc: { ...disc, wa: false }, banners: { ...s.banners, wa: false } }); say('WhatsApp terhubung lagi', '12 event tertahan sedang dikirim'); }, 'p'), A('Putuskan', () => cfOpen('wa'), 'd')] },
         { icon: ic.bars, title: 'Ad Account', sub: adOn ? 'act_2049381726 · Kopi Senja Ads' : 'Belum terhubung', status: adOn ? 'Terhubung' : 'Belum terhubung', pill: adOn ? stP(true) : pill('neutral'), emq: false, alert: '',
@@ -574,17 +572,15 @@ class Component extends DCLogic {
     const ic = this.icons();
     const rootStyle = { ...this.theme(dark, P.accent ?? 'orange', P.statusStyle ?? 'brand'), background: 'var(--bg)', color: 'var(--text)', minHeight: '100vh', fontFamily: "'Poppins',sans-serif" };
     const W = s.width, mobile = W < 768, wide = W >= 1024;
-    const ownerPhone = P.profilePhone ? normPhone(P.profilePhone) : '';
-    const ownerPhoneMasked = ownerPhone ? ownerPhone.slice(0, 4) + '-•••-' + ownerPhone.slice(-4) : 'nomor belum diisi';
-    // Nomor WA yang terdaftar di koneksi (dari wa_sessions via health), fallback ke nomor pemilik akun
+    // Nomor WhatsApp berasal hanya dari sesi WhatsApp terakhir, bukan nomor profil pemilik akun.
     const liveHealth = P.live?.raw?.overview?.health || null;
-    const waPhoneMasked = displayPhone(liveHealth?.wa_phone || liveHealth?.wa_phone_masked) || ownerPhoneMasked;
+    const waPhoneMasked = displayPhone(liveHealth?.wa_phone || liveHealth?.wa_phone_masked);
     const metaConnected = !s.disc?.meta && !!s.f?.dataset && !!s.f?.token;
     const waConnected = liveWaConnected(liveHealth, !!s.waOn && !s.disc?.wa);
     const healthIssues = [metaConnected, waConnected].filter((connected) => !connected).length;
     const healthSummary = healthIssues ? healthIssues + ' koneksi bermasalah' : 'Semua koneksi sehat';
     const healthMetaStatus = metaConnected ? 'Terhubung · token berlaku ' + (s.tokenDays ?? 0) + ' hari lagi' : 'Terputus · hubungkan Meta Dataset';
-    const healthWaTitle = 'WhatsApp ' + waPhoneMasked;
+    const healthWaTitle = waPhoneMasked ? 'WhatsApp ' + waPhoneMasked : 'WhatsApp';
     const healthWaStatus = waConnected ? 'Terhubung · Cloud API' : 'Terputus · Cloud API';
     const common = { rootStyle, ic, f: { ...s.f, ...(P.activeWorkspace ? { biz: P.activeWorkspace.name, industry: P.activeWorkspace.category || s.f.industry } : {}) }, toggleDark: () => this.setState({ dark: !dark, menu: null }), darkLabel: dark ? 'Mode terang' : 'Mode gelap', darkIcon: dark ? ic.sun : ic.moon, isOnboarding: screen === 'onboarding', isApp: screen === 'app' };
 
@@ -736,7 +732,7 @@ class Component extends DCLogic {
       row: { display: 'flex', gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--border)', background: isUnread(k, unreadFlag) ? 'var(--surface2)' : 'transparent' },
       iconStyle: { width: 30, height: 30, flex: 'none', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tone[t][0], color: tone[t][1] } }));
     const BAN = [
-      ['wa', 'err', 'WhatsApp ' + waPhoneMasked + ' terputus.', 'Event dari nomor ini ditahan sampai terhubung lagi.', 'Hubungkan ulang', 'koneksi'],
+      ['wa', 'err', waPhoneMasked ? 'WhatsApp ' + waPhoneMasked + ' terputus.' : 'WhatsApp terputus.', 'Event dari nomor ini ditahan sampai terhubung lagi.', 'Hubungkan ulang', 'koneksi'],
       ['token', 'warn', 'Token Meta kedaluwarsa dalam 5 hari.', 'Event berhenti terkirim setelah 22 Okt.', 'Ganti token', 'koneksi'],
       ['trial', 'info', 'Trial Growth tersisa 9 hari.', 'Pilih paket agar fitur ROAS & Event tetap aktif.', 'Pilih paket', 'pengaturan'],
     ].filter(([k]) => s.banners[k] && (k !== 'wa' || !waConnected));

@@ -15,15 +15,6 @@ const h2 = { margin: 0, fontSize: 16, fontWeight: 600 };
 const mono = { fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 13 };
 const btn = { height: 46, padding: '0 18px', border: 'none', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, fontWeight: 500, cursor: 'pointer' };
 
-const STATUS = {
-  connected: ['Terhubung', 'var(--accent)'],
-  pending: ['Belum dites', 'var(--muted)'],
-  invalid: ['Token tidak valid', 'var(--danger)'],
-  expired: ['Token kedaluwarsa', 'var(--danger)'],
-  error: ['Gagal', 'var(--danger)'],
-  disconnected: ['Terputus', 'var(--danger)'],
-};
-
 function Secret({ value, onChange, placeholder }) {
   const [show, setShow] = useState(false);
   return (
@@ -55,6 +46,7 @@ function CopyRow({ title, text }) {
 function QrSection({ slug, wa, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const connected = wa.status === 'connected';
   const stop = async () => {
     if (!window.confirm('Batalkan koneksi WhatsApp? Chat baru tidak akan tercatat sampai Anda scan QR lagi.')) return;
     setBusy(true); setMsg('');
@@ -64,7 +56,10 @@ function QrSection({ slug, wa, onChanged }) {
     <section style={card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <h2 style={h2}>WhatsApp</h2>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Terhubung{wa.phone_masked ? ` · ${String(wa.phone_masked).replace('****', '•••')}` : ''}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: connected ? 'var(--okFg)' : 'var(--errFg)' }}>
+          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: connected ? 'var(--okFg)' : 'var(--errFg)' }} />
+          {connected ? 'connected' : 'disconnected'}{wa.phone_masked ? ` · ${String(wa.phone_masked).replace('****', '•••')}` : ''}
+        </span>
       </div>
       <span style={hintStyle}>Chat dari iklan di nomor ini tercatat otomatis. Biarkan WhatsApp Business di ponsel tetap aktif dan terhubung internet (buka minimal sekali tiap 14 hari agar sesi tidak dicabut).</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
@@ -81,7 +76,10 @@ function QrLostSection({ onReconnect }) {
     <section style={{ ...card, boxShadow: 'inset 0 0 0 1.5px var(--danger)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <h2 style={h2}>WhatsApp</h2>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--danger)' }}>Terputus</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--errFg)' }}>
+          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--errFg)' }} />
+          disconnected
+        </span>
       </div>
       <span style={hintStyle}>Koneksi WhatsApp ke Convera terputus (mis. perangkat tertaut dihapus dari ponsel). Chat baru tidak tercatat sampai Anda scan QR lagi.</span>
       <div><button type="button" onClick={onReconnect} style={{ ...btn, background: 'var(--accent)', color: '#fff' }}>Hubungkan ulang (scan QR)</button></div>
@@ -168,7 +166,8 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
 
   if (loadError) return <div role="alert" style={{ ...card, maxWidth: 760, color: 'var(--danger)', fontSize: 14 }}>{loadError}</div>;
   if (!conn) return <div style={{ ...card, maxWidth: 760, color: 'var(--muted)', fontSize: 14 }}>Memuat koneksi…</div>;
-  const [stText, stColor] = STATUS[conn.status] || STATUS.pending;
+  const metaConnected = conn.status === 'connected';
+  const [stText, stColor] = metaConnected ? ['connected', 'var(--okFg)'] : ['disconnected', 'var(--errFg)'];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 760 }}>
@@ -176,7 +175,10 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
       <section style={card}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <h2 style={h2}>Meta CAPI</h2>
-          <span style={{ fontSize: 12, fontWeight: 600, color: stColor }}>{stText}{conn.last_check_at ? ` · dicek ${new Date(conn.last_check_at).toLocaleString('id-ID')}` : ''}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: stColor }}>
+            <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: stColor }} />
+            {stText}
+          </span>
         </div>
         <div style={label}>Jenis koneksi WhatsApp
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
