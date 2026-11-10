@@ -8,4 +8,3 @@ html,body{height:100%;margin:0}#root,#root>.sc-host{height:100%}
 .sc-interp.sc-missing{display:inline-block;width:2em;height:1em;overflow:hidden}
 .profile-layout{width:100%}
 @media (max-width:760px){.profile-layout{grid-template-columns:1fr !important}}
-@media (min-width:761px){#root aside{padding-bottom:38px !important}#root::after{content:'v1.1';position:fixed;left:22px;bottom:10px;z-index:40;color:var(--muted);font-family:'Poppins',sans-serif;font-size:11px;font-weight:500;letter-spacing:0;pointer-events:none}}

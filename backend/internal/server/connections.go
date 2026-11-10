@@ -490,8 +490,12 @@ ON CONFLICT (workspace_id) DO UPDATE SET status=$2, phone_masked=COALESCE(NULLIF
 	ok(c, gin.H{"status": in.Status})
 }
 
-// processTx memproses satu pesan dalam transaksi sendiri.
+// processTx memproses satu pesan dalam transaksi sendiri. Pesan untuk workspace yang belum dibayar atau
+// langganannya berakhir diabaikan (tidak membuat lead, pesan, maupun event) dan dilaporkan sebagai tidak diproses.
 func (s *Server) processTx(ctx context.Context, workspaceID string, m core.Message) (bool, error) {
+	if ok, err := core.WorkspaceAccess(ctx, s.DB, workspaceID); err != nil || !ok {
+		return false, err
+	}
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
 		return false, err

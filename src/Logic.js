@@ -177,7 +177,7 @@ class Component extends DCLogic {
     const topAds = allAds.slice().sort((x, y) => y.a[4] - x.a[4]).slice(0, 5).map(({ a, camp }) => ({ name: a[0], camp, ini: ini(a[0]), thumb: thumb(adIdx(a[0])), spend: rpS(a[1]), chat: fmt(a[2]), purch: fmt(a[4]), roas: roasT(a[5] / a[1]), rs: roasPill(a[5] / a[1]) }));
     const health = [['Meta Dataset', metaOn ? 'Terhubung' : 'Terputus', metaOn ? 'ok' : 'err'], ['WhatsApp ' + waPhoneMasked, waOn ? 'Terhubung' : 'Terputus', waOn ? 'ok' : 'err'], ['Event gagal 24 jam', '3 event', 'warn'], ['Masa berlaku token Meta', tokenDays + ' hari lagi', tokenDays < 14 ? 'warn' : 'ok']]
       .map(([label, value, k]) => ({ label, value, dot: { width: 8, height: 8, borderRadius: '50%', flex: 'none', background: dotC(k) }, vs: { fontSize: 13, fontWeight: 500, color: k === 'ok' ? 'var(--text)' : 'var(--accentText)' } }));
-    const steps = [['Buat workspace', 'Laundry Kilat Bersih · Jasa · Depok', true], ['Hubungkan Meta Dataset', 'Dataset & access token untuk Conversions API', true], ['Hubungkan WhatsApp', 'Agar chat dari iklan tercatat sebagai Lead', false, 'Hubungkan', 'koneksi'], ['Pilih cara kirim konversi', 'API, tandai manual, atau aturan otomatis', false, 'Atur', 'aturan'], ['Kirim event percobaan', 'Pastikan event muncul di Meta Test Events', false, 'Kirim tes', 'developer']]
+    const steps = [['Buat workspace', 'Laundry Kilat Bersih · Jasa · Depok', true], ['Hubungkan Meta Dataset', 'Dataset & access token untuk Conversions API', true], ['Hubungkan WhatsApp', 'Supaya chat dari iklan tercatat sebagai Lead', false, 'Hubungkan', 'koneksi'], ['Pilih cara kirim konversi', 'API, tandai manual, atau aturan otomatis', false, 'Atur', 'aturan'], ['Kirim event percobaan', 'Pastikan event muncul di Meta Test Events', false, 'Kirim tes', 'developer']]
       .map(([title, desc, done, cta, pg]) => ({ title, desc, todo: !done, cta, go: goP(pg), mark: done ? ic.check : '', ts: { fontSize: 14, fontWeight: 500, color: done ? 'var(--muted)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none' }, dot: { width: 26, height: 26, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: done ? 'var(--accent)' : 'var(--neutral)', color: '#fff' } }));
     const ov = { starter: s.ws === 3, full: s.ws !== 3, kpis, funnel, funnelRate: 'Klik → Purchase ' + (purch / klik * 100).toFixed(1).replace('.', ',') + '%', chatLine, chatArea: chatLine + ' L700,219 L0,219 Z', purchLine: path(ps, pMax), xL, yL: [cMax, cMax / 2, 0].map(fmt), yR: [pMax, pMax / 2, 0].map(fmt), topAds, health, steps, goPerf: goP('performa'), goKoneksi: goP('koneksi') };
     if (LV) Object.assign(ov, liveOverview(LV, { pill, thumb, ic, rp, rpS, goP, dotC, ini }));
@@ -214,7 +214,7 @@ class Component extends DCLogic {
     if (ml) {
       const ev = s.mk.ev, needsValue = ['Purchase', 'InitiateCheckout', 'AddToCart'].includes(ev);
       const amt = Number((s.mk.amount || '').replace(/\D/g, '') || 0);
-      const warn = LV && LV.mode === 'qr' ? '' : ml.organic ? 'Lead ini bukan dari iklan (tidak ada ctwa_clid), jadi tidak bisa diatribusikan ke Meta.' : ml.hl <= 0 ? 'Klik iklan terjadi ' + tfmt(ml.clickAt) + ' — sudah lewat 7 hari. Meta menolak atribusi untuk lead ini.' : '';
+      const warn = LV && LV.mode === 'qr' ? '' : ml.organic ? 'Lead ini bukan dari iklan, jadi tidak dikirim ke Meta.' : ml.hl <= 0 ? 'Klik iklan terjadi ' + tfmt(ml.clickAt) + '. Sudah lewat 7 hari, jadi Meta tidak menerima event dari lead ini.' : '';
       const dis = !!warn || (needsValue && !amt);
       const upd = (o) => set({ mk: { ...s.mk, ...o } });
       mk = { open: true, who: ml.name + ' · ' + ml.phone + (ml.A ? ' · ' + ml.A.name : ''), close: () => set({ mk: null }), warn,
@@ -242,7 +242,7 @@ class Component extends DCLogic {
       if (!dl.organic && ['Checkout', 'Purchase'].includes(dl.base)) TL.push(['InitiateCheckout terkirim · ' + rp(dl.baseVal), add(95)]);
       if (dl.base === 'Purchase') TL.push(['Purchase terkirim · ' + rp(dl.baseVal), add(180)]);
       dl.events.forEach((e) => TL.push([e.ev + ' terkirim manual' + (e.amt ? ' · ' + rp(e.amt) : ''), 'Baru saja']));
-      if (dl.organic) TL.push(['Tidak dikirim ke Meta — chat organik tanpa ctwa_clid', '']);
+      if (dl.organic) TL.push(['Tidak dikirim ke Meta: chat ini bukan dari iklan', '']);
       }
       const [cd] = cdOf(dl);
       const fs = (mono) => ({ fontSize: 13, fontWeight: 400, color: 'var(--text)', fontFamily: mono ? "'Poppins',monospace" : 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' });
@@ -375,9 +375,9 @@ class Component extends DCLogic {
       const ts = Math.floor(+le.d / 1000);
       const payload = { data: [{ event_name: le.ev, event_time: ts, event_id: le.order, action_source: 'business_messaging', messaging_channel: 'whatsapp', user_data: { ph: [sha(le.i)], ctwa_clid: le.clid, page_id: '104857392018273' }, ...(le.value ? { custom_data: { currency: 'IDR', value: le.value } } : {}) }] };
       const RESP = { Terkirim: { events_received: 1, messages: [], fbtrace_id: 'A7xQ2mLp9Zt' }, Gagal: { error: { message: 'Invalid parameter', type: 'OAuthException', code: 100, error_subcode: 2804050, error_user_msg: 'user_data.ph tidak valid' } }, Retry: { error: { message: 'Application request limit reached', code: 4 } }, Kedaluwarsa: { error: { message: 'event_time is too far in the past', code: 100, error_subcode: 2804003 } }, Duplikat: { skipped: true, reason: 'duplicate event_id', original: 'evt_' + (90412 - le.i - 3) } };
-      const EX = { Gagal: ['Nomor telepon pelanggan tidak valid', 'Meta menolak karena nomor kosong atau formatnya salah sebelum di-hash. Event ini tidak diulang otomatis.', ['Pastikan nomor diawali 62, tanpa spasi atau tanda +.', 'Perbaiki data kontak, lalu klik Kirim ulang.']], Retry: ['Meta sedang membatasi permintaan', 'Terlalu banyak event dalam waktu singkat. Convera mencoba lagi otomatis — kamu tidak perlu melakukan apa-apa.', ['Percobaan berikutnya dalam ±2 menit (3 dari 5).']], Kedaluwarsa: ['Lewat batas 7 hari sejak klik iklan', 'Meta hanya menerima konversi CTWA maksimal 7 hari setelah klik. Event ini tidak bisa dikirim ulang.', ['Tandai Purchase lebih cepat dari halaman Leads.', 'Aktifkan Event agar closing tercatat seketika.']], Duplikat: ['Event yang sama sudah pernah dikirim', 'event_id ini sudah terkirim sebelumnya, jadi dilewati agar konversi tidak dihitung dua kali.', ['Tidak perlu tindakan.']] }[le.st];
+      const EX = { Gagal: ['Nomor telepon pelanggan tidak valid', 'Meta menolak karena nomor kosong atau formatnya salah sebelum di-hash. Event ini tidak diulang otomatis.', ['Pastikan nomor diawali 62, tanpa spasi atau tanda +.', 'Perbaiki data kontak, lalu klik Kirim ulang.']], Retry: ['Meta sedang membatasi permintaan', 'Meta sedang membatasi kiriman. Convera akan mencoba lagi otomatis.', ['Percobaan berikutnya dalam ±2 menit (3 dari 5).']], Kedaluwarsa: ['Lewat batas 7 hari sejak klik iklan', 'Meta hanya menerima konversi CTWA maksimal 7 hari setelah klik. Event ini tidak bisa dikirim ulang.', ['Tandai Purchase lebih cepat dari halaman Leads.', 'Aktifkan Event supaya closing langsung tercatat.']], Duplikat: ['Event yang sama sudah pernah dikirim', 'event_id ini sudah terkirim sebelumnya, jadi dilewati supaya konversi tidak dihitung dua kali.', ['Tidak perlu tindakan.']] }[le.st];
       const t0 = String(le.d.getHours()).padStart(2, '0') + ':' + String(le.d.getMinutes()).padStart(2, '0');
-      const RET = { Terkirim: [[t0 + ':04', '200', 'Diterima Meta · events_received: 1']], Duplikat: [[t0 + ':02', '—', 'Dilewati — event_id ' + le.order + ' sudah terkirim']], Retry: [[t0 + ':03', '429', 'Rate limit dari Meta'], [t0 + ':33', '429', 'Rate limit dari Meta'], ['Terjadwal', '—', 'Percobaan 3/5 dalam 2 menit']], Gagal: [[t0 + ':03', '400', 'Invalid parameter: user_data.ph'], [t0 + ':35', '400', 'Invalid parameter: user_data.ph'], [t0 + ':58', '400', 'Dihentikan — error permanen']], Kedaluwarsa: [[t0 + ':02', '400', 'event_time lebih dari 7 hari']] }[le.st] || [];
+      const RET = { Terkirim: [[t0 + ':04', '200', 'Diterima Meta · events_received: 1']], Duplikat: [[t0 + ':02', '—', 'Dilewati: event_id ' + le.order + ' sudah terkirim']], Retry: [[t0 + ':03', '429', 'Rate limit dari Meta'], [t0 + ':33', '429', 'Rate limit dari Meta'], ['Terjadwal', '—', 'Percobaan 3/5 dalam 2 menit']], Gagal: [[t0 + ':03', '400', 'Invalid parameter: user_data.ph'], [t0 + ':35', '400', 'Invalid parameter: user_data.ph'], [t0 + ':58', '400', 'Dihentikan: error permanen']], Kedaluwarsa: [[t0 + ':02', '400', 'event_time lebih dari 7 hari']] }[le.st] || [];
       const tab = s.lgTab || 'payload';
       lgd = { open: true, close: () => set({ lgOpen: null }), id: le.id + ' · ' + le.order, ev: le.ev, st: le.st, pill: pill(EVP[le.st]),
         tabs: [['payload', 'Payload'], ['respons', 'Respons Meta'], ['riwayat', 'Riwayat retry']].map(([k, label]) => ({ label, pick: () => set({ lgTab: k }), style: { fontFamily: 'inherit', height: 38, padding: 0, border: 'none', borderBottom: tab === k ? '2px solid var(--accent)' : '2px solid transparent', background: 'transparent', color: tab === k ? 'var(--text)' : 'var(--muted)', fontSize: 14, fontWeight: tab === k ? 500 : 400, cursor: 'pointer', whiteSpace: 'nowrap' } })),
@@ -435,7 +435,7 @@ class Component extends DCLogic {
           rows: adOn ? [kRow('Spend 7 hari', 'Rp 7.120.000'), kRow('Sinkron terakhir', '14:05 · tiap jam'), kRow('Mata uang', 'IDR')] : [kRow('Dibutuhkan untuk', 'Spend, CPP, ROAS')],
           actions: adOn ? [A('Ganti akun', () => say('Pilih Ad Account', 'Membuka Meta Business…')), A('Putuskan', () => cfOpen('ad'), 'd')] : [A('Hubungkan Ad Account', () => { set({ disc: { ...disc, ad: false }, ws: s.ws === 1 ? 0 : s.ws }); say('Ad Account terhubung'); }, 'p')] },
       ] };
-    const CF = { meta: ['Putuskan Meta Dataset?', 'Event baru tidak akan dikirim ke Meta dan optimasi iklan kehilangan sinyal konversi. Data yang sudah terkirim tetap aman.'], wa: ['Putuskan nomor WhatsApp?', 'Chat baru dari iklan tidak lagi tercatat sebagai Lead. Riwayat lead tetap tersimpan.'], ad: ['Putuskan Ad Account?', 'Spend, Cost per Purchase, dan ROAS tidak lagi diperbarui.'] };
+    const CF = { meta: ['Putuskan Meta Dataset?', 'Event baru berhenti dikirim ke Meta, jadi iklan tidak lagi dapat data konversi. Data yang sudah terkirim tetap ada.'], wa: ['Putuskan nomor WhatsApp?', 'Chat baru dari iklan tidak lagi tercatat sebagai Lead. Riwayat lead tetap tersimpan.'], ad: ['Putuskan Ad Account?', 'Spend, Cost per Purchase, dan ROAS tidak lagi diperbarui.'] };
     const cf = s.delLead ? { open: true, title: 'Hapus lead ini?', body: s.delLead.name + ' (' + s.delLead.phone + ') beserta seluruh event dan riwayat chatnya akan dihapus permanen dan tidak bisa dikembalikan.', cta: 'Ya, hapus', close: () => set({ delLead: null }),
       ok: () => { const d = s.delLead; set({ delLead: null, ldOpen: s.ldOpen === d.id ? null : s.ldOpen, ldSel: { ...(s.ldSel || {}), [d.id]: false } });
         if (LV) { this.__host.liveDeleteLead(d.id).then((r) => say(r.ok ? 'Lead dihapus' : 'Gagal menghapus lead', r.ok ? d.name : r.message)); return; }
@@ -444,7 +444,7 @@ class Component extends DCLogic {
 
     // ---------- integrasi ----------
     const ion = s.intOn || { 0: true };
-    const ig = { items: [['Webhook / API', 'Kirim event dari bot, CRM, atau sistem kasir lewat endpoint Convera.', 'ok'], ['Google Sheets', 'Tandai Purchase dari baris spreadsheet — cocok untuk rekap order manual.', 'off'], ['n8n', 'Otomasi tanpa kode: trigger dari payment gateway, form, atau toko online.', 'off'], ['Form order', 'Form checkout ringan; setiap submit dikirim sebagai InitiateCheckout.', 'off'], ['Instagram DM', 'Lacak chat dari iklan Click-to-Instagram Direct.', 'soon'], ['TikTok', 'Kirim konversi ke TikTok Events API.', 'soon'], ['Messenger', 'Lacak chat dari iklan Click-to-Messenger.', 'soon']]
+    const ig = { items: [['Webhook / API', 'Kirim event dari bot, CRM, atau sistem kasir lewat endpoint Convera.', 'ok'], ['Google Sheets', 'Tandai Purchase langsung dari spreadsheet order.', 'off'], ['n8n', 'Kirim event dari payment gateway, form, atau toko online tanpa coding.', 'off'], ['Form order', 'Form checkout ringan; setiap submit dikirim sebagai InitiateCheckout.', 'off'], ['Instagram DM', 'Lacak chat dari iklan Click-to-Instagram Direct.', 'soon'], ['TikTok', 'Kirim konversi ke TikTok Events API.', 'soon'], ['Messenger', 'Lacak chat dari iklan Click-to-Messenger.', 'soon']]
       .map(([name, desc, st], i) => { const on = st === 'ok' || ion[i]; const soon = st === 'soon'; return { name, desc, ini: ini(name), logo: thumb(i, 44), badge: soon ? 'SEGERA' : on ? 'TERHUBUNG' : 'TERSEDIA', bs: pill(soon ? 'neutral' : on ? 'ok' : 'plain', { height: 22, fontSize: 10, letterSpacing: '0.04em' }), btn: soon ? 'Kabari saya' : on ? 'Atur' : 'Hubungkan', btnStyle: { ...(soon ? bW : on ? bW : bP), alignSelf: 'flex-start' }, act: () => { if (soon) say('Kami akan kabari', name + ' segera hadir'); else if (on) set({ page: 'developer' }); else { set({ intOn: { ...ion, [i]: true } }); say(name + ' terhubung'); } } }; }) };
 
     // ---------- developer ----------
@@ -460,7 +460,7 @@ class Component extends DCLogic {
     };
     const dc = s.devCode || 'curl';
     const whE = s.whEv || { sent: true, failed: true, quota: false, lead: false };
-    const dv = { sbDesc: sbox ? 'Aktif — event dikirim dengan test_event_code dan tidak memengaruhi iklan.' : 'Nonaktif — event dikirim ke Meta dan dipakai untuk optimasi iklan.', sb: sw(sbox, () => set({ sandbox: !sbox })),
+    const dv = { sbDesc: sbox ? 'Aktif: event hanya untuk tes, tidak memengaruhi iklan.' : 'Nonaktif: event dikirim ke Meta dan dipakai untuk optimasi iklan.', sb: sw(sbox, () => set({ sandbox: !sbox })),
       newKey: () => set({ keyModal: { step: 'ask', label: '' } }),
       keys: keys.map((k, i) => ({ ...k, revoke: () => { set({ keys: keys.filter((_, j) => j !== i) }); say('API key dicabut', k.label); } })),
       url: URL_, copyUrl: () => copy(URL_, 'url'), copyUrlLabel: s.copied === 'url' ? 'Tersalin' : 'Salin',
@@ -490,7 +490,7 @@ class Component extends DCLogic {
     const PLANS = [['Workspace', 150000, 'Per workspace', ['1 workspace & 1 nomor WhatsApp', 'Event & Log Event', 'Laporan', 'Koneksi Meta & WhatsApp']]];
     const curPlan = s.plan || null;
     const priceOf = (p) => bill === 'tahunan' ? p * 10 : p;
-    const NT = [['WhatsApp / Meta terputus', 'Segera, agar event tidak tertahan', 1, 1], ['Token Meta hampir kedaluwarsa', '14, 7, dan 1 hari sebelumnya', 1, 1], ['Event gagal > 10 dalam 1 jam', 'Ringkasan error & saran perbaikan', 1, 0], ['Kuota event 80% & 100%', 'Agar tidak ada konversi yang terlewat', 1, 1], ['Ringkasan harian', 'Chat, Purchase, dan nilai kemarin', 0, 1], ['Laporan mingguan', 'Setiap Senin pagi', 1, 0], ['Anggota tim baru', 'Saat undangan diterima', 1, 0]];
+    const NT = [['WhatsApp / Meta terputus', 'Segera, supaya event tidak tertahan', 1, 1], ['Token Meta hampir kedaluwarsa', '14, 7, dan 1 hari sebelumnya', 1, 1], ['Event gagal > 10 dalam 1 jam', 'Ringkasan error & saran perbaikan', 1, 0], ['Kuota event 80% & 100%', 'Supaya tidak ada konversi yang terlewat', 1, 1], ['Ringkasan harian', 'Chat, Purchase, dan nilai kemarin', 0, 1], ['Laporan mingguan', 'Setiap Senin pagi', 1, 0], ['Anggota tim baru', 'Saat undangan diterima', 1, 0]];
     const nts = s.nt || {};
     const demoSessions = [[ic.monitor, 'Chrome · Windows', 'Jakarta · 103.47.x.x · sekarang', true], [ic.phone, 'Safari · iPhone 15', 'Jakarta · 2 jam lalu', false], [ic.monitor, 'Edge · Windows', 'Bandung · 3 hari lalu', false]];
     const formatSession = (item) => {
@@ -518,7 +518,7 @@ class Component extends DCLogic {
       invite: () => { const em = (s.invEmail || '').trim(); if (!/.+@.+\..+/.test(em)) { say('Email belum valid'); return; } set({ invites: [...(s.invites || []), [em.split('@')[0], em, s.invRole || 'CS', 'Undangan terkirim']], invEmail: '' }); say('Undangan terkirim', em); },
       members: members.map(([name, email, role, state]) => ({ name, email, role, state, ini: ini(name), ps: roleP(role) })),
       perms: [['Lihat dashboard & laporan', 1, 1, 1, 1], ['Tandai Purchase di Leads', 1, 1, 1, 0], ['Kelola aturan otomatis', 1, 1, 0, 0], ['Kelola koneksi & API key', 1, 1, 0, 0], ['Undang & atur anggota', 1, 1, 0, 0], ['Paket, tagihan & hapus workspace', 1, 0, 0, 0]].map(([label, ...c]) => ({ label, cells: c.map((v) => ({ t: v ? '✓' : '—', s: { textAlign: 'center', fontWeight: 600, color: v ? 'var(--accentText)' : 'var(--borderStrong)' } })) })),
-      planName: curPlan ? 'Paket ' + curPlan : 'Trial Growth', planState: curPlan ? 'Aktif' : 'Sisa 9 hari', planPill: pill(curPlan ? 'ok' : 'soft'), planSub: curPlan ? 'Diperpanjang otomatis 17 Nov 2026 · QRIS' : 'Berakhir 26 Okt 2026. Pilih paket agar ROAS & Event tetap aktif.',
+      planName: curPlan ? 'Paket ' + curPlan : 'Trial Growth', planState: curPlan ? 'Aktif' : 'Sisa 9 hari', planPill: pill(curPlan ? 'ok' : 'soft'), planSub: curPlan ? 'Diperpanjang otomatis 17 Nov 2026 · QRIS' : 'Berakhir 26 Okt 2026. Pilih paket supaya ROAS & Event tetap aktif.',
       billTabs: [['bulanan', 'Bulanan'], ['tahunan', 'Tahunan · hemat 2 bulan']].map(([k, label]) => ({ label, pick: () => set({ bill: k }), style: { fontFamily: 'inherit', height: 32, padding: '0 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', background: bill === k ? 'var(--surface)' : 'transparent', color: bill === k ? 'var(--text)' : 'var(--muted)' } })),
       plans: PLANS.map(([name, price, quota, feats]) => { const hi = false; const cur = curPlan === name; return { name, quota, price: rp(priceOf(price)), per: bill === 'tahunan' ? '/ tahun' : '/ bulan', tag: hi ? 'POPULER' : '', tagStyle: { fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', padding: '3px 8px', borderRadius: 999, background: 'var(--accent)', color: '#fff' },
         features: feats.map((t) => ({ t, ts: { color: hi ? 'var(--accent)' : 'var(--accentText)', fontWeight: 600 } })),
@@ -535,7 +535,7 @@ class Component extends DCLogic {
       delPhone: s.delPhone || '', setDelPhone: (e) => set({ delPhone: e.target.value }), delContact: () => { const ph = normPhone(s.delPhone || ''); if (ph.length < 9) { say('Isi nomor terlebih dahulu', 'Contoh: 0812-3456-7890'); return; }
         if (LV) { set({ delPhone: '' }); this.__host.liveErasePhone(ph).then((r) => say(r.ok ? 'Data kontak dihapus' : 'Gagal menghapus', r.message)); return; } const found = LEADS.filter((l) => normPhone(l.phone) === ph).length; if (!found) { say('Nomor tidak ditemukan', 'Tidak ada lead dengan nomor ini'); return; } set({ delPhone: '', delPhones: [...(s.delPhones || []), ph], kvNew: (s.kvNew || []).filter((e) => normPhone(e.phone) !== ph) }); say('Data kontak dihapus', found + ' lead & riwayat chat dihapus permanen'); },
       delName: s.delName || '', setDelName: (e) => set({ delName: e.target.value }), delStyle: { ...BTN, height: 44, background: '#fff', color: '#b8530f', opacity: delOk ? 1 : 0.5, cursor: delOk ? 'pointer' : 'not-allowed' },
-      delWs: () => { if (!delOk) return; set({ delName: '', wsDelAt: Date.now() + 864e5 }); say('Permintaan hapus diterima', 'Workspace dihapus dalam 24 jam — bisa dibatalkan lewat email'); },
+      delWs: () => { if (!delOk) return; set({ delName: '', wsDelAt: Date.now() + 864e5 }); say('Permintaan hapus diterima', 'Workspace dihapus dalam 24 jam. Bisa dibatalkan lewat email.'); },
     };
     const coS = s.checkout;
     let co = { open: false };
@@ -587,7 +587,7 @@ class Component extends DCLogic {
     // ---------- onboarding ----------
     const STEPS = [['Workspace', 'Profil bisnis'], ['Hubungkan Meta', 'Dataset & token'], ['Hubungkan WhatsApp', 'Cloud API atau QR'], ['Cara kirim konversi', 'API, manual, otomatis'], ['Selesai', 'Cek & kirim event uji']];
     const HEAD = [
-      ['WORKSPACE', 'Ceritakan bisnismu', 'Satu workspace = satu bisnis. Kamu bisa menambah workspace lain kapan saja — cocok untuk agency.'],
+      ['WORKSPACE', 'Ceritakan bisnismu', 'Satu workspace untuk satu bisnis. Workspace berikutnya perlu langganan sendiri.'],
       ['META CONVERSIONS API', 'Hubungkan Meta Dataset', 'Convera mengirim event ke Dataset (Pixel) yang dipakai iklan Click-to-WhatsApp kamu.'],
       ['WHATSAPP', 'Hubungkan nomor WhatsApp', 'Chat dari iklan otomatis tercatat sebagai Lead beserta kampanye, ad set, dan iklan asalnya.'],
       ['KONVERSI', 'Bagaimana closing dicatat?', 'Pilih cara tim kamu menandai pembelian. Semua dikirim ke Meta maksimal 7 hari sejak klik iklan.'],
@@ -621,7 +621,7 @@ class Component extends DCLogic {
       dot: { width: 28, height: 28, flex: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, background: state === 'ok' ? 'var(--okBg)' : state === 'pending' ? 'var(--warnBg)' : 'var(--errBg)', color: state === 'ok' ? 'var(--okFg)' : state === 'pending' ? 'var(--warnFg)' : 'var(--errFg)' } });
     const checklist = [
       ck('Workspace “' + (s.f.biz || 'Tanpa nama') + '”', s.f.industry + ' · IDR · ' + s.f.tz.split(' ')[0], s.f.biz ? 'ok' : 'err', 0),
-      ck('Meta Dataset', metaOk ? 'Terhubung · EMQ 7,8' : 'Belum dites — klik Tes Koneksi', metaOk ? 'ok' : 'err', 1),
+      ck('Meta Dataset', metaOk ? 'Terhubung · EMQ 7,8' : 'Belum dites. Klik Tes Koneksi', metaOk ? 'ok' : 'err', 1),
       ck('WhatsApp', s.wa === 'qr' ? 'Menunggu scan QR' : waOk ? 'Cloud API · +62 812-•••-7890' : 'Data Cloud API belum lengkap', s.wa === 'qr' ? 'pending' : waOk ? 'ok' : 'err', 2),
       ck('Cara kirim konversi', nMethods ? M.filter(([id]) => s.methods[id]).map(([, t]) => t.split(' ')[0] === 'API' ? 'API' : t.split(' ')[0] === 'Tandai' ? 'Manual' : 'Otomatis').join(' · ') : 'Belum dipilih', nMethods ? 'ok' : 'err', 3),
     ];
@@ -640,7 +640,7 @@ class Component extends DCLogic {
       waCloud: s.wa === 'cloud', waQr: s.wa === 'qr', qrPath: qr, spinnerDark: this.spin(),
       methods, checklist, sentDone: sendDone,
       sendTitle: sendDone ? 'Event percobaan diterima Meta' : 'Kirim event percobaan',
-      sendDesc: s.sendErr ? 'Gagal: ' + s.sendErr : sendDone ? 'Purchase · Rp 1 · test_event_code TEST48213 — cek di Events Manager → Test Events.' : 'Kami kirim Purchase bernilai Rp 1 dengan test_event_code, tidak memengaruhi iklan.',
+      sendDesc: s.sendErr ? 'Gagal: ' + s.sendErr : sendDone ? 'Purchase · Rp 1 · test_event_code TEST48213. Cek di Events Manager → Test Events.' : 'Kami kirim Purchase bernilai Rp 1 dengan test_event_code, tidak memengaruhi iklan.',
       sendLabel: s.send === 'loading' ? 'Mengirim…' : sendDone ? 'Kirim lagi' : 'Kirim event percobaan', sendIcon: s.send === 'loading' ? this.spin() : ic.send,
       sendTest: async () => { this.setState({ send: 'loading', pop: false, sendErr: '' }); const pl = await buildEvent({ event: 'Purchase', value: 1, clid: 'test_' + randomToken(16), phone: '6281200000000', testCode: 'TEST48213' }); const r = await sendEvent(pl, { datasetId: this.state.f.dataset, token: this.state.f.token }); if (!r.ok) { this.setState({ send: 'idle', sendErr: r.error }); return; } this.setState({ send: 'done' }); setTimeout(() => this.setState({ pop: true }), 30); },
       popStyle: { width: 52, height: 52, flex: 'none', borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transform: s.pop ? 'scale(1)' : 'scale(0.4)', opacity: s.pop ? 1 : 0, transition: 'transform .45s cubic-bezier(.34,1.56,.64,1), opacity .25s', boxShadow: s.pop ? '0 0 0 8px var(--accentSoft)' : 'none' },
@@ -659,6 +659,7 @@ class Component extends DCLogic {
       ['overview', 'Overview', 'dash', null, null, '', 3],
       ['leads', 'Leads', 'users', null, null, '', 4],
       ['konversi', 'Konversi', 'bag', null, null, '', 4],
+      ['performa', 'Performa Iklan', 'bars', 'GROWTH', null, 'Spend, Purchase, dan ROAS per kampanye, ad set, dan iklan.', 7],
       ['aturan', 'Event', 'zap', 'GROWTH', null, '', 7],
       ['log', 'Log Event', 'list', null, 'DATA', '', 5],
       ['laporan', 'Laporan', 'file', 'GROWTH', null, '', 7],
@@ -693,11 +694,11 @@ class Component extends DCLogic {
       const value = e.target.value;
       this.setState((st) => ({ [key]: value, range: key === 'customFrom' ? (value && st.customTo ? 6 : st.range) : (st.customFrom && value ? 6 : st.range) }));
     };
-    const customLabel = React.createElement('span', { style: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1 } },
+    const customLabel = React.createElement('span', { style: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 } },
       React.createElement('span', null, 'Pilih tanggal'),
-      React.createElement('span', { style: { display: 'flex', gap: 6 } },
-        React.createElement('input', { type: 'date', value: customFrom, onClick: (e) => e.stopPropagation(), onChange: setCustomDate('customFrom'), 'aria-label': 'Tanggal mulai', style: { minWidth: 0, width: '50%', height: 30, border: '1px solid var(--border)', borderRadius: 6, padding: '0 5px', background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'inherit', fontSize: 11 } }),
-        React.createElement('input', { type: 'date', value: customTo, onClick: (e) => e.stopPropagation(), onChange: setCustomDate('customTo'), 'aria-label': 'Tanggal akhir', style: { minWidth: 0, width: '50%', height: 30, border: '1px solid var(--border)', borderRadius: 6, padding: '0 5px', background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'inherit', fontSize: 11 } })),
+      React.createElement('span', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+        React.createElement('input', { type: 'date', value: customFrom, onClick: (e) => e.stopPropagation(), onChange: setCustomDate('customFrom'), 'aria-label': 'Tanggal mulai', style: { minWidth: 0, width: '100%', boxSizing: 'border-box', height: 30, border: '1px solid var(--border)', borderRadius: 6, padding: '0 5px', background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'inherit', fontSize: 11 } }),
+        React.createElement('input', { type: 'date', value: customTo, onClick: (e) => e.stopPropagation(), onChange: setCustomDate('customTo'), 'aria-label': 'Tanggal akhir', style: { minWidth: 0, width: '100%', boxSizing: 'border-box', height: 30, border: '1px solid var(--border)', borderRadius: 6, padding: '0 5px', background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'inherit', fontSize: 11 } })),
     );
     const PRE = [0, 1, 2, 3, 4, 5].map((i) => { const r = rangeFor(i); return [r.label, r.hint]; }).concat([['Kustom', customFrom && customTo ? customFrom + ' – ' + customTo : 'Pilih rentang']]);
     const presets = PRE.map(([label, hint], i) => ({ label: i === 6 ? customLabel : label, hint: i === 6 ? '' : hint, pick: () => { if (i < 6) this.setState({ range: i, menu: null }); }, style: { fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 8, border: 'none', cursor: i === 6 ? 'default' : 'pointer', textAlign: 'left', fontSize: 13, fontWeight: i === s.range ? 500 : 400, background: i === s.range ? 'var(--accentSoft)' : 'transparent', color: i === s.range ? 'var(--accentText)' : 'var(--text)' } }));
@@ -712,7 +713,7 @@ class Component extends DCLogic {
       if (rs.status === 'trial' && daysLeft > 0) {
         const tone = daysLeft <= 3 ? 'err' : 'warn';
         const icon = daysLeft <= 3 ? 'alert' : 'clock';
-        return [tone, icon, 'Trial tersisa ' + daysLeft + ' hari · Upgrade sekarang agar semua fitur tetap aktif.', 'Sekarang', true];
+        return [tone, icon, 'Trial tersisa ' + daysLeft + ' hari · Upgrade sekarang supaya fitur tetap aktif.', 'Sekarang', true];
       }
       if (rs.status === 'expired' || rs.status === 'stopped' || (rs.status === 'trial' && daysLeft === 0)) {
         return ['err', 'alert', 'Masa trial berakhir · Semua fitur terkunci kecuali Overview. Upgrade untuk membuka akses penuh.', 'Sekarang', true];
@@ -734,7 +735,7 @@ class Component extends DCLogic {
     const BAN = [
       ['wa', 'err', waPhoneMasked ? 'WhatsApp ' + waPhoneMasked + ' terputus.' : 'WhatsApp terputus.', 'Event dari nomor ini ditahan sampai terhubung lagi.', 'Hubungkan ulang', 'koneksi'],
       ['token', 'warn', 'Token Meta kedaluwarsa dalam 5 hari.', 'Event berhenti terkirim setelah 22 Okt.', 'Ganti token', 'koneksi'],
-      ['trial', 'info', 'Trial Growth tersisa 9 hari.', 'Pilih paket agar fitur ROAS & Event tetap aktif.', 'Pilih paket', 'pengaturan'],
+      ['trial', 'info', 'Trial Growth tersisa 9 hari.', 'Pilih paket supaya ROAS & Event tetap aktif.', 'Pilih paket', 'pengaturan'],
     ].filter(([k]) => s.banners[k] && (k !== 'wa' || !waConnected));
     const bStyle = { err: ['var(--errBg)', 'var(--errFg)'], warn: ['var(--accentSoft)', 'var(--accentText)'], info: ['var(--neutral)', 'var(--text)'] };
     const banners = BAN.slice(0, 1).map(([k, t, title, body, cta, page]) => ({ title, body: '', cta, icon: t === 'info' ? ic.clock : ic.alert,
@@ -773,7 +774,7 @@ class Component extends DCLogic {
       openHelp: menu('help'), helpMenu: s.menu === 'help', openUser: menu('user'), userMenu: s.menu === 'user',
       goOnboarding: () => this.setState({ screen: 'onboarding', menu: null }),
       banners, moreBanners: BAN.length > 1 ? BAN.length - 1 : 0,
-      pageTitle: page[1], pageBadge: 'v1.1', pageDesc: page[5], pagePhase: page[6],
+      pageTitle: page[1], pageBadge: null, appVersion: 'v1.3', pageDesc: page[5], pagePhase: page[6],
       mainStyle: { padding: mobile ? '18px 16px 96px' : '24px 28px 48px', display: 'flex', flexDirection: 'column', gap: 18, width: '100%', maxWidth: 1440 },
       skel4: [1, 2, 3, 4], skelRows: [1, 2, 3, 4, 5].map((k) => ({ a: { width: 120 + ((k * 37) % 80), height: 12, borderRadius: 6, background: 'var(--neutral)' }, b: { width: 70 + ((k * 23) % 40), height: 12, borderRadius: 6, background: 'var(--neutral)' } })),
       bottomNav, moreOpen: s.more, openMore: () => this.setState({ more: true }), closeMore: () => this.setState({ more: false }), moreNav,

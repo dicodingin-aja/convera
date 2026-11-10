@@ -14,7 +14,7 @@ export default class ErrorBoundary extends React.Component {
       <div role="alert" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: '#faf8f5', color: '#1d1c1a', fontFamily: "'Poppins',sans-serif" }}>
         <div style={{ maxWidth: 420, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <h1 style={{ margin: 0, fontSize: 20 }}>Halaman tidak bisa ditampilkan</h1>
-          <p style={{ margin: 0, fontSize: 14, color: '#6b6761' }}>Terjadi kesalahan saat menampilkan aplikasi. Data Anda aman. Coba muat ulang; bila masih sama, reset tampilan.</p>
+          <p style={{ margin: 0, fontSize: 14, color: '#6b6761' }}>Halaman gagal ditampilkan. Data kamu tidak hilang. Coba muat ulang, kalau masih sama, reset tampilan.</p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button type="button" onClick={() => location.reload()} style={{ ...btn, background: '#e8590c', color: '#fff' }}>Muat ulang</button>
             <button type="button" onClick={reset} style={{ ...btn, background: '#ece8e1', color: '#1d1c1a' }}>Reset tampilan</button>

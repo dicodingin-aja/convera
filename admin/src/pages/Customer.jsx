@@ -82,13 +82,13 @@ function Detail({ id, onClose, onChanged }) {
         </div>
           </>
         )}
-        <h2>Riwayat pembayaran</h2>
+        <h2>Riwayat pembayaran{d.ad_slots != null ? <span className="muted sm" style={{ fontWeight: 400, marginLeft: 10 }}>Slot kampanye: {d.ad_slots_used || 0} dari {d.ad_slots} terpakai</span> : null}</h2>
         <div className="tablewrap">
           <table>
             <thead><tr><th>Tanggal</th><th>Periode</th><th>Paket</th><th className="right">Nominal</th><th>Sales</th></tr></thead>
             <tbody>
               {d.payments.map((p) => (
-                <tr key={p.id}><td>{fmtShort(p.paid_at)}</td><td>{p.months} bulan · s/d {fmtShort(p.period_end)}</td><td>{p.plan_name}</td><td className="right">{rp(p.amount)}</td><td>{p.sales}</td></tr>
+                <tr key={p.id}><td>{fmtShort(p.paid_at)}</td><td>{p.months} bulan · s/d {fmtShort(p.period_end)}</td><td>{p.purchase === 'slots' ? 'Tambah slot' : p.plan_name} · {p.ad_slots || 1} kampanye</td><td className="right">{rp(p.amount)}</td><td>{p.sales}</td></tr>
               ))}
               {d.payments.length === 0 ? <tr><td colSpan="5" className="muted">Belum ada pembayaran.</td></tr> : null}
             </tbody>

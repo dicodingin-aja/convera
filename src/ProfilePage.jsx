@@ -37,7 +37,7 @@ function ProfileForm({ profile, onSave }) {
     <form onSubmit={submit} style={card}>
       <div>
         <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Profil</h2>
-        <p style={{ margin: '5px 0 0', color: 'var(--muted)', fontSize: 12 }}>Kelola informasi akun yang digunakan Convera.</p>
+        <p style={{ margin: '5px 0 0', color: 'var(--muted)', fontSize: 12 }}>Nama, email, dan password akun kamu.</p>
       </div>
       <label style={label}>Username<input value={form.username || ''} readOnly disabled style={{ ...field, opacity: 0.7 }} /></label>
       <label style={label}>Email<input value={form.email || ''} readOnly disabled style={{ ...field, opacity: 0.7 }} /></label>
@@ -47,7 +47,6 @@ function ProfileForm({ profile, onSave }) {
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div>
           <span style={{ fontSize: 14, fontWeight: 600 }}>Ubah password</span>
-          <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: 12 }}>Password baru akan disimpan dan diverifikasi oleh server.</p>
         </div>
         {[['current', 'Password saat ini'], ['next', 'Password baru'], ['again', 'Ulangi password baru']].map(([k, l]) => (
           <label key={k} style={label}><span>{l}</span><input value={pw[k]} onChange={updPw(k)} type="password" autoComplete={k === 'current' ? 'current-password' : 'new-password'} style={field} /></label>
@@ -72,7 +71,7 @@ export default function ProfilePage({ themeStyle, profile, onSave, workspaces, a
       <main style={{ maxWidth: 720, margin: '0 auto', padding: '32px 24px 48px', display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 650, letterSpacing: '-.02em' }}>Profil saya</h1>
-          <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 13 }}>Perbarui data akun dan keamanan login Anda.</p>
+          <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 13 }}>Ubah data akun dan password kamu.</p>
         </div>
         <div className="profile-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(280px, .85fr)', alignItems: 'start', gap: 20 }}>
           <ProfileForm profile={profile} onSave={onSave} />

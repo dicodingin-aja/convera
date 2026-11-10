@@ -12,6 +12,7 @@ import QrScanPage from './QrScanPage.jsx';
 import { fetchLive, emptyLive, liveApi, notifApi, rangeFor } from './services/live.js';
 import { appConfig } from './services/config.js';
 import PaymentModal from './PaymentModal.jsx';
+import AdSlotsPanel from './AdSlotsPanel.jsx';
 import LoginPage from './LoginPage.jsx';
 import { getSession, logout, initials, clearLocalSession } from './services/auth.js';
 import { getSub, subInfo, activate } from './plans.js';
@@ -47,7 +48,9 @@ export default class App extends React.Component {
     this.logic.state = { ...this.logic.state, menu: null };
     this.setState({ route: 'profile' });
   };
-  openPlans = (index) => this.setState({ plansFor: typeof index === 'number' ? index : this.logic.state.ws });
+  openPlans = (index) => this.setState({ plansFor: typeof index === 'number' ? index : this.logic.state.ws, payMode: 'subscription' });
+  // Tambah slot kampanye untuk workspace aktif (modal bayar mode 'slots').
+  openSlots = () => this.setState({ plansFor: this.logic.state.ws, payMode: 'slots' });
   pickPlan = (plan) => {
     const i = this.state.plansFor;
     const subs = this.logic.state.subs || {};
@@ -93,7 +96,7 @@ export default class App extends React.Component {
   handleLogout = async () => {
     const support = this.state.session?.support;
     await logout();
-    if (support) { try { sessionStorage.setItem('convera:notice', 'Sesi dukungan diakhiri. Anda bisa menutup tab ini.'); } catch { /* abaikan */ } }
+    if (support) { try { sessionStorage.setItem('convera:notice', 'Sesi dukungan selesai. Tab ini boleh ditutup.'); } catch { /* abaikan */ } }
     this.logic.state = { ...this.logic.state, menu: null };
     this.setState({ session: null, route: null, plansFor: null, workspaces: null, realSub: null, live: null });
   };
@@ -102,7 +105,7 @@ export default class App extends React.Component {
     if (!this.state.session) return;
     const support = this.state.session.support;
     clearLocalSession();
-    try { sessionStorage.setItem('convera:notice', support ? 'Sesi dukungan berakhir.' : 'Sesi berakhir. Silakan masuk lagi.'); } catch { /* abaikan */ }
+    try { sessionStorage.setItem('convera:notice', support ? 'Sesi dukungan berakhir.' : 'Sesi berakhir. Masuk lagi untuk lanjut.'); } catch { /* abaikan */ }
     this.setState({ session: null, route: null, plansFor: null, workspaces: null, realSub: null, live: null });
   };
   // Mode backend: daftar workspace di UI = workspace milik akun ini di server (bukan daftar contoh).
@@ -116,12 +119,15 @@ export default class App extends React.Component {
     } catch { this.setState({ workspaces: [] }); }
   };
   // Setelah workspace baru dibuat dari dialog: muat ulang daftar, pindah ke workspace itu, kosongkan data lama.
-  handleWorkspaceCreated = async () => {
+  // Workspace selain yang pertama tidak mendapat trial: langsung buka pilihan paket agar customer membayarnya.
+  handleWorkspaceCreated = async (created) => {
     await this.loadWorkspaces();
     const n = (this.state.workspaces || []).length;
-    this.__setLogicState({ ws: Math.max(0, n - 1), page: 'overview', menu: null });
+    const index = Math.max(0, n - 1);
+    this.__setLogicState({ ws: index, page: 'overview', menu: null });
     this._liveKey = null;
-    this.setState({ createWsOpen: false, live: null, realSub: null, route: null });
+    const mustPay = created && created.subscription_status && created.subscription_status !== 'trial';
+    this.setState({ createWsOpen: false, live: null, realSub: null, route: null, plansFor: mustPay ? index : null });
   };
   saveProfile = async (profile, password) => {
     const savedProfile = await updateProfile(profile);
@@ -134,7 +140,7 @@ export default class App extends React.Component {
       const [sessions, audit] = await Promise.all([listSessions(), listAuditLogs()]);
       this.setState({ security: { sessions, audit } });
     } catch (error) {
-      this.setState({ securityError: error.message || 'Data keamanan tidak dapat dimuat.' });
+      this.setState({ securityError: error.message || 'Gagal memuat data. Coba muat ulang halaman.' });
     }
   };
   saveSecurityPassword = async (current, next) => {
@@ -217,7 +223,7 @@ export default class App extends React.Component {
     try {
       const r = await liveApi.convert(slug, leadId, ev, value);
       await this.refreshLive();
-      const msg = { queued: 'Sistem akan mengirimnya ke Meta sebentar lagi.', pending_value: 'Menunggu nilai pembelian diisi.', failed: r.reason || 'Tidak bisa dikirim ke Meta.', skipped: r.reason || 'Tidak dikirim.', duplicate: 'Event serupa sudah pernah dicatat.' }[r.duplicate ? 'duplicate' : r.status] || '';
+      const msg = { queued: 'Segera dikirim ke Meta.', pending_value: 'Menunggu nilai pembelian diisi.', failed: r.reason || 'Tidak bisa dikirim ke Meta.', skipped: r.reason || 'Tidak dikirim.', duplicate: 'Event ini sudah pernah tercatat.' }[r.duplicate ? 'duplicate' : r.status] || '';
       return { ok: !r.duplicate && ['queued', 'pending_value'].includes(r.status), queued: r.status === 'queued', message: msg };
     } catch (e) { return { ok: false, message: e.message || 'Terjadi kesalahan' }; }
   };
@@ -251,7 +257,7 @@ export default class App extends React.Component {
     if (Date.now() - last >= IDLE_LIMIT_MS) this.idleLogout();
   };
   idleLogout = async () => {
-    try { sessionStorage.setItem('convera:notice', 'Anda keluar otomatis karena tidak ada aktivitas selama 30 menit. Silakan masuk lagi.'); } catch { /* abaikan */ }
+    try { sessionStorage.setItem('convera:notice', 'Kamu otomatis keluar karena 30 menit tidak aktif. Masuk lagi untuk lanjut.'); } catch { /* abaikan */ }
     try { await logout(); } catch { /* tetap keluar di sisi browser */ }
     try { localStorage.removeItem(this._idleKey); } catch { /* abaikan */ }
     this.setState({ session: null, route: null, plansFor: null, workspaces: null, realSub: null, live: null });
@@ -314,9 +320,15 @@ export default class App extends React.Component {
     if (appConfig.backendEnabled && rs && rs.name === activeWs.name) {
       const d = (x) => new Date(x).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
       const left = (x) => Math.max(0, Math.ceil((new Date(x) - Date.now()) / 864e5));
-      vals.subStatus = { active: 'Aktif · s/d ' + d(rs.current_period_end), trial: 'Trial · ' + left(rs.trial_until) + ' hari', pending: 'Menunggu verifikasi', expired: 'Berakhir', stopped: 'Dihentikan' }[rs.status] || 'Belum berlangganan';
+      const subLabel = { active: 'Aktif · s/d ' + d(rs.current_period_end), trial: 'Trial · ' + left(rs.trial_until) + ' hari', pending: 'Menunggu verifikasi', expired: 'Berakhir', stopped: 'Dihentikan' }[rs.status] || 'Belum berlangganan';
+      // Slot di baris sendiri supaya teks tidak terpotong di tengah kotak sidebar.
+      vals.subStatus = rs.ad_slots ? <>{subLabel}<span style={{ display: 'block' }}>{rs.ad_slots_used || 0}/{rs.ad_slots} kampanye</span></> : subLabel;
       vals.subBtn = rs.status === 'active' ? 'Perpanjang' : 'Upgrade';
-      const isExpired = rs.status === 'expired' || rs.status === 'stopped' || rs.status === 'pending' ||
+      // Sama dengan aturan akses di server (billing.AccessSQL): 'pending' (bukti transfer menunggu verifikasi)
+      // tetap terbuka selama trial atau periode sebelumnya belum habis.
+      const future = (x) => !!x && new Date(x) > Date.now();
+      const isExpired = rs.status === 'expired' || rs.status === 'stopped' || rs.status === 'none' ||
+        (rs.status === 'pending' && !future(rs.trial_until) && !future(rs.current_period_end)) ||
         (rs.status === 'trial' && left(rs.trial_until) === 0);
       vals.subExpired = isExpired;
       // Redirect ke overview jika halaman saat ini terkunci
@@ -337,6 +349,7 @@ export default class App extends React.Component {
     if (appConfig.backendEnabled) {
       vals.laporanNode = <LaporanPage key={'lap' + activeWs.slug} slug={activeWs.slug} workspaceName={activeWs.name} />;
       vals.dashExtraNode = <DashboardExtras key={'dash' + activeWs.slug} slug={activeWs.slug} range={rangeFor(this.rangeIdx())} />;
+      vals.perfSlotsNode = activeWs.slug ? <AdSlotsPanel key={'slots' + activeWs.slug + ':' + (this.state.slotsV || 0)} slug={activeWs.slug} onAddSlots={this.openSlots} /> : null;
     }
     if (appConfig.backendEnabled) {
       // "Tambah workspace" (pilihan workspace / tombol kosong) membuka kartu isian nama di atas Dashboard, seperti PixelAD.
@@ -352,7 +365,7 @@ export default class App extends React.Component {
     }
     const { plansFor } = this.state;
     const modal = plansFor !== null && appConfig.backendEnabled ? (
-      <PaymentModal themeStyle={vals.rootStyle} workspace={vals.wsAll[plansFor]} onClose={() => this.setState({ plansFor: null })} onDone={this.loadRealSub} />
+      <PaymentModal themeStyle={vals.rootStyle} workspace={vals.wsAll[plansFor]} mode={this.state.payMode || 'subscription'} onClose={() => this.setState({ plansFor: null, slotsV: (this.state.slotsV || 0) + 1 })} onDone={this.loadRealSub} />
     ) : plansFor !== null ? (
       <PlansModal themeStyle={vals.rootStyle} workspace={vals.wsAll[plansFor].name} renew={subInfo(getSub(st.subs, plansFor)).active} onPick={this.pickPlan} onClose={() => this.setState({ plansFor: null })} />
     ) : null;
@@ -364,7 +377,7 @@ export default class App extends React.Component {
     ) : null;
     const banner = support ? (
       <div role="status" style={{ ...vals.rootStyle, position: 'fixed', top: 0, left: 0, right: 0, zIndex: 300, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, flexWrap: 'wrap', padding: '6px 12px', background: '#b4440f', color: '#fff', fontSize: 13, fontWeight: 600 }}>
-        <span>Mode dukungan · {support.workspaceName} · admin {support.admin} · berakhir {support.expiresAt ? new Date(support.expiresAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—'} · tindakan Anda dicatat</span>
+        <span>Mode dukungan · {support.workspaceName} · admin {support.admin} · berakhir {support.expiresAt ? new Date(support.expiresAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—'} · tindakan kamu dicatat</span>
         <button type="button" onClick={this.handleLogout} style={{ height: 28, padding: '0 12px', border: '1px solid rgba(255,255,255,.7)', borderRadius: 8, background: 'transparent', color: '#fff', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Akhiri sesi dukungan</button>
       </div>
     ) : null;

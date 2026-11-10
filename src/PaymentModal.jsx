@@ -5,6 +5,8 @@ import { rupiah } from './plans.js';
 
 // Modal bayar (mode backend), dibuat singkat: harga + isi paket, rekening tujuan, unggah bukti, kirim.
 // Setelah terkirim tampil halaman "Pembayaran sedang diproses" + kontak CS. Langganan aktif setelah admin memverifikasi.
+// Harga per slot kampanye: total = harga paket x jumlah kampanye x bulan (1 bulan = 30 hari).
+// mode 'slots' = tambah slot di tengah langganan yang berjalan (selalu 30 hari, langganan utama tidak berubah).
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const OK_EXT = /\.(jpe?g|png|pdf)$/i;
@@ -25,7 +27,7 @@ function Processing({ onClose }) {
       </span>
       <h2 id="pay-title" style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Pembayaran sedang diproses</h2>
       <p style={{ margin: 0, maxWidth: 420, color: 'var(--muted)', fontSize: 14, lineHeight: 1.55 }}>
-        Bukti transfer Anda sudah kami terima. Tim Convera sedang mencocokkannya dengan mutasi rekening. Paket aktif otomatis setelah terverifikasi dan Anda akan mendapat notifikasi.
+        Bukti transfer sudah masuk. Kami cek dulu ke rekening, biasanya kurang dari 1×24 jam. Kamu dapat notifikasi begitu paket aktif.
       </p>
       {cs ? (
         <div style={{ ...box, alignSelf: 'stretch', alignItems: 'center', gap: 8 }}>
@@ -39,14 +41,16 @@ function Processing({ onClose }) {
   );
 }
 
-export default function PaymentModal({ themeStyle, workspace, onClose, onDone }) {
+const MAX_SLOTS = 50;
+
+export default function PaymentModal({ themeStyle, workspace, onClose, onDone, mode: startMode = 'subscription' }) {
   const [slug, setSlug] = useState(null);
   const [plans, setPlans] = useState([]);
   const [banks, setBanks] = useState([]);
   const [proofs, setProofs] = useState([]);
   const [sub, setSub] = useState(null);
   const [loadError, setLoadError] = useState('');
-  const [f, setF] = useState({ plan: '', months: 1, bankAccount: '' });
+  const [f, setF] = useState({ plan: '', months: 1, bankAccount: '', slots: 1, purchase: startMode });
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -63,14 +67,21 @@ export default function PaymentModal({ themeStyle, workspace, onClose, onDone })
         const [p, b, st, pr] = await Promise.all([getPlans(), getBankAccounts(s), getSubscription(s), getMyProofs(s)]);
         if (!alive) return;
         setSlug(s); setPlans(p); setBanks(b); setSub(st); setProofs(pr);
-        setF((x) => ({ ...x, plan: p[0]?.id || '', bankAccount: b[0]?.id || '' }));
+        const running = st && (st.status === 'active' || st.status === 'trial');
+        // Perpanjang: mulai dari jumlah kampanye yang sedang dilacak. Tambah slot hanya untuk langganan berjalan.
+        setF((x) => ({ ...x, plan: p[0]?.id || '', bankAccount: b[0]?.id || '', purchase: running ? x.purchase : 'subscription',
+          slots: x.purchase === 'slots' && running ? 1 : Math.min(MAX_SLOTS, Math.max(1, st?.ad_slots_used || 1)) }));
       } catch (e) { if (alive) setLoadError(e.message || 'Gagal memuat'); }
     })();
     return () => { alive = false; };
   }, [workspace.name]);
 
   const plan = plans.find((p) => p.id === f.plan);
-  const billed = !plan ? 0 : f.months === 12 && plan.price12 ? plan.price12 : plan.price * f.months;
+  const isSlots = f.purchase === 'slots';
+  const months = isSlots ? 1 : f.months;
+  const billed = !plan ? 0 : (months === 12 && plan.price12 ? plan.price12 : plan.price * months) * f.slots;
+  const running = sub && (sub.status === 'active' || sub.status === 'trial');
+  const setSlots = (n) => setF((x) => ({ ...x, slots: Math.min(MAX_SLOTS, Math.max(1, n)) }));
   const features = (plan?.features || []).map(featureText).filter(Boolean);
   const pendingFull = proofs.filter((p) => p.status === 'pending').length >= 3;
   const ready = !!file && !!plan && !!f.bankAccount && !pendingFull;
@@ -93,7 +104,8 @@ export default function PaymentModal({ themeStyle, workspace, onClose, onDone })
     e.preventDefault();
     if (!ready) return;
     const fd = new FormData();
-    fd.append('plan', f.plan); fd.append('months', String(f.months)); fd.append('amount', String(billed));
+    fd.append('plan', f.plan); fd.append('months', String(months)); fd.append('amount', String(billed));
+    fd.append('ad_slots', String(f.slots)); fd.append('purchase', f.purchase);
     fd.append('bank_account_id', f.bankAccount);
     fd.append('file', file); // file terakhir agar isian teks sudah terbaca server
     setBusy(true); setError('');
@@ -110,7 +122,7 @@ export default function PaymentModal({ themeStyle, workspace, onClose, onDone })
           <>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
               <div>
-                <h2 id="pay-title" style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Bayar langganan</h2>
+                <h2 id="pay-title" style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{isSlots ? 'Tambah slot kampanye' : 'Bayar langganan'}</h2>
                 <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 14 }}>{workspace.name}</p>
               </div>
               <button type="button" onClick={onClose} aria-label="Tutup" style={{ border: 0, background: 'var(--surface2)', color: 'var(--text)', borderRadius: 8, width: 34, height: 34, cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
@@ -120,7 +132,14 @@ export default function PaymentModal({ themeStyle, workspace, onClose, onDone })
               <div style={{ color: 'var(--muted)' }}>Belum ada paket yang tersedia.</div>
             ) : (
               <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {sub?.has_pending_proof ? <div style={{ ...box, fontSize: 13 }}>Ada bukti transfer yang sedang menunggu verifikasi. Anda tetap bisa mengirim bukti lain (maksimal 3 menunggu).</div> : null}
+                {sub?.has_pending_proof ? <div style={{ ...box, fontSize: 13 }}>Masih ada bukti transfer yang sedang dicek. Kamu tetap bisa kirim bukti lain (maksimal 3 sekaligus).</div> : null}
+
+                {running ? (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => setF((x) => ({ ...x, purchase: 'subscription' }))} style={chip(!isSlots)}>Perpanjang langganan</button>
+                    <button type="button" onClick={() => setF((x) => ({ ...x, purchase: 'slots', slots: 1 }))} style={chip(isSlots)}>Tambah slot kampanye</button>
+                  </div>
+                ) : null}
 
                 {/* 1. Harga + isi paket */}
                 <div style={box}>
@@ -130,12 +149,24 @@ export default function PaymentModal({ themeStyle, workspace, onClose, onDone })
                     </div>
                   ) : null}
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 15, fontWeight: 600 }}>Paket {plan?.name}</span>
-                    <span><b style={{ fontSize: 26, letterSpacing: '-0.02em' }}>{rupiah(billed)}</b> <span style={{ fontSize: 13, color: 'var(--muted)' }}>/ {f.months} bulan</span></span>
+                    <span style={{ fontSize: 15, fontWeight: 600 }}>{isSlots ? 'Slot kampanye tambahan' : 'Paket ' + (plan?.name || '')}</span>
+                    <span><b style={{ fontSize: 26, letterSpacing: '-0.02em' }}>{rupiah(billed)}</b> <span style={{ fontSize: 13, color: 'var(--muted)' }}>/ {months * 30} hari</span></span>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {[1, 3, 12].map((m) => <button key={m} type="button" onClick={() => setF((x) => ({ ...x, months: m }))} style={chip(f.months === m)}>{m} bulan</button>)}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 14 }}>Jumlah kampanye iklan<div style={{ fontSize: 12, color: 'var(--muted)' }}>{rupiah(plan?.price || 0)} per kampanye per 30 hari</div></span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <button type="button" aria-label="Kurangi kampanye" onClick={() => setSlots(f.slots - 1)} disabled={f.slots <= 1} style={{ ...chip(false), width: 38, padding: 0 }}>−</button>
+                      <input id="pay-slots" aria-label="Jumlah kampanye" inputMode="numeric" value={f.slots} onChange={(e) => setSlots(Number(e.target.value.replace(/\D/g, '')) || 1)} style={{ width: 52, height: 38, textAlign: 'center', border: 'none', borderRadius: 10, background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', fontSize: 15, fontWeight: 600 }} />
+                      <button type="button" aria-label="Tambah kampanye" onClick={() => setSlots(f.slots + 1)} disabled={f.slots >= MAX_SLOTS} style={{ ...chip(false), width: 38, padding: 0 }}>+</button>
+                    </span>
                   </div>
+                  {isSlots ? (
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>Slot tambahan aktif 30 hari sejak pembayaran disetujui.{sub?.ad_slots ? ` Sekarang ${sub.ad_slots_used || 0} dari ${sub.ad_slots} slot terpakai.` : ''}</span>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {[1, 3, 12].map((m) => <button key={m} type="button" onClick={() => setF((x) => ({ ...x, months: m }))} style={chip(f.months === m)}>{m} bulan · {m * 30} hari</button>)}
+                    </div>
+                  )}
                   {features.length ? (
                     <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14 }}>
                       {features.map((t) => <li key={t} style={{ display: 'flex', gap: 8, alignItems: 'center' }}><span style={{ color: 'var(--accentText)', fontWeight: 700 }}>✓</span>{t}</li>)}
@@ -172,7 +203,7 @@ export default function PaymentModal({ themeStyle, workspace, onClose, onDone })
                     <b style={{ fontSize: 13, color: 'var(--muted)' }}>Riwayat bukti transfer</b>
                     {proofs.slice(0, 3).map((p) => (
                       <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13, padding: '10px 12px', borderRadius: 10, background: 'var(--surface2)' }}>
-                        <span>{new Date(p.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })} · {p.plan_name} · {p.months} bln · {rupiah(p.billed)}</span>
+                        <span>{new Date(p.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })} · {p.purchase === 'slots' ? 'Tambah slot' : p.plan_name} · {p.ad_slots || 1} kampanye · {p.months * 30} hari · {rupiah(p.billed)}</span>
                         <span style={{ color: p.status === 'rejected' ? 'var(--danger)' : 'var(--muted)', textAlign: 'right' }}>{STATUS_ID[p.status]}{p.reject_reason ? ': ' + p.reject_reason : ''}</span>
                       </div>
                     ))}

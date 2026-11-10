@@ -27,7 +27,7 @@ Idempoten lewat `webhook_inbox (provider, message_id)`.
 | `POST /v1/leads` | Bearer API key | Forward lead dari sistem klien |
 | `POST /v1/events` | Bearer API key | Pemicu konversi (202). Cari lead lewat `ctwa_clid` lalu `phone` |
 | `POST /api/v1/auth/register`, `login`, `logout`; `GET auth/session` | – / sesi | Akun |
-| `GET/POST /api/v1/workspaces` | sesi | Buat workspace -> otomatis langganan `trial` (`settings.trial_days`) |
+| `GET/POST /api/v1/workspaces` | sesi | Workspace pertama -> `trial` (`settings.trial_days`). Berikutnya `expired` (wajib bayar); 409 `unpaid_workspace` bila masih ada workspace yang belum pernah dibayar |
 | `GET /overview?from&to` | sesi | KPI, seri harian, top iklan |
 | `GET /leads`, `GET /leads/:id`, `POST /leads/:id/conversions` | sesi | Lead dan tandai konversi manual |
 | `GET /conversions`, `GET /events`, `GET /events/:id` | sesi | Event Log (`/conversions` tanpa event uji) |
@@ -38,6 +38,10 @@ Idempoten lewat `webhook_inbox (provider, message_id)`.
 | `GET /subscription`, `GET /bank-accounts`, `GET/POST /payment-proofs` | sesi | Halaman bayar: status langganan, rekening tujuan, riwayat, dan **unggah bukti transfer** (multipart) |
 | `GET/POST/PUT/DELETE /event-mappings`, `POST /event-mappings/test` | sesi | Aturan event (tabel `event_rules`) |
 | `GET/POST/DELETE /api-keys` | sesi | API key; key penuh hanya tampil sekali |
+| `GET /ad-slots` | sesi | Slot kampanye: `quota`, `used`, `free`, target yang memakai slot (`tracked`, dengan `effective`), dan pilihan (`candidates`) |
+| `POST /ad-slots/track`, `POST /ad-slots/release` `{kind: campaign\|ad, id}` | sesi | Lacak (409 `slots_full`) atau lepas kampanye/iklan |
+| `GET/PUT/DELETE /connections/ads`, `POST /connections/ads/sync` | sesi | Akun Meta Ads (opsional, `ads_read`) untuk Performa Iklan dan peta iklan -> kampanye |
+| `GET /performance?from&to` | sesi | Pohon kampanye > ad set > iklan: spend dari Meta, lead/purchase dari Convera |
 | `POST /internal/qr/:workspace_id/messages`, `/status` | `X-Service-Token` | Dipanggil layanan sesi QR |
 
 ## Aturan yang ditegakkan
@@ -74,6 +78,20 @@ Idempoten lewat `webhook_inbox (provider, message_id)`.
 - Endpoint admin ada di ADMIN_API.md.
 - Frontend belum disambungkan ke endpoint ini (masih mock, halaman Koneksi masih menyimpan token di localStorage).
 
+## Langganan dan slot kampanye
+
+- Akses fitur hanya untuk trial yang berjalan atau langganan aktif (termasuk masa tenggang). Selain itu aksi fitur dijawab
+  **402 `subscription_required`**, pesan WhatsApp masuk diabaikan, dan worker menandai event `skipped` / `subscription_inactive`.
+  Aturan ada di `billing.AccessSQL` dan `core.WorkspaceAccess`.
+- Harga paket = **per kampanye per 30 hari**. Kuota slot = slot langganan yang berjalan (atau trial: `settings.trial_ad_slots`,
+  default 1) + slot tambahan yang masih berlaku (`payments.purchase = 'slots'`, 30 hari sejak disetujui).
+- Satu slot = satu kampanye Meta. Bila kampanye sebuah iklan belum diketahui (akun Meta Ads belum tersambung/tersinkron),
+  satu iklan = satu slot; setelah sinkron, target iklan digabung ke kampanyenya (`core.ConsolidateTracked`).
+- Worker mengecek slot sebelum mengirim event dari lead yang punya `ad_id`. Slot kosong diisi otomatis (`tracked_targets.auto`);
+  bila penuh, event `skipped` / `ad_not_tracked`. Chat organik (tanpa `ad_id`) tidak memakai slot.
+- Kampanye yang mulai dilacak memakai slot 30 hari walau dilepas lebih awal. Bila kuota turun, yang lebih dulu dilacak didahulukan.
+- Logika: `internal/core/slots.go`. Uji: `internal/server/ad_slots_test.go`.
+
 ## Unggah bukti transfer
 
 `POST /api/v1/payment-proofs` (multipart/form-data, header `X-Workspace` bila punya >1 workspace, `X-CSRF-Token` wajib):
@@ -81,7 +99,9 @@ Idempoten lewat `webhook_inbox (provider, message_id)`.
 | Field | Wajib | Keterangan |
 |---|---|---|
 | `plan` | ya | kode paket yang tampil (`workspace`) |
-| `months` | ya | 1, 3, atau 12 |
+| `months` | ya | 1, 3, atau 12. Satu bulan = 30 hari |
+| `ad_slots` | tidak | jumlah slot kampanye, 1-50 (default 1). Tagihan = harga paket x slot x bulan (12 bulan: `price_12m` x slot) |
+| `purchase` | tidak | `subscription` (default) atau `slots` = tambah slot 30 hari untuk langganan yang sedang berjalan (422 bila tidak berjalan; `months` dipaksa 1; status langganan tidak berubah) |
 | `bank`, `sender` | ya | bank dan nama pemilik rekening pengirim |
 | `ref`, `message`, `bank_account_id` | tidak | no. referensi, catatan, rekening tujuan yang dipakai (harus aktif) |
 | `amount` | tidak | nominal yang ditransfer menurut customer (klaim, untuk dicocokkan admin; tagihan dihitung server) |

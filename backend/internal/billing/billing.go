@@ -16,6 +16,10 @@ func AddMonths(t time.Time, n int) time.Time {
 	return time.Date(target.Year(), target.Month(), d, t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
 }
 
+// DaysPerMonth: satu "bulan" langganan dihitung 30 hari (3 bulan = 90 hari, 12 bulan = 360 hari), sama dengan
+// slot tambahan yang juga berlaku 30 hari.
+const DaysPerMonth = 30
+
 // NextPeriod menentukan periode yang dibeli. Bila langganan masih berjalan (currentEnd di masa depan),
 // periode baru mulai dari currentEnd (sisa hari tidak hilang); selain itu mulai dari sekarang.
 func NextPeriod(now time.Time, currentEnd *time.Time, months int) (start, end time.Time) {
@@ -23,7 +27,19 @@ func NextPeriod(now time.Time, currentEnd *time.Time, months int) (start, end ti
 	if currentEnd != nil && currentEnd.After(now) {
 		start = *currentEnd
 	}
-	return start, AddMonths(start, months)
+	return start, start.AddDate(0, 0, months*DaysPerMonth)
+}
+
+// MaxAdSlots: batas jumlah slot dalam satu pembelian.
+const MaxAdSlots = 50
+
+// ProofPrice menghitung tagihan: harga per slot per bulan x slot x bulan; 12 bulan memakai harga 12 bulan per slot
+// bila diisi. Pembelian 'slots' (tambah slot di tengah periode) selalu 1 bulan (30 hari).
+func ProofPrice(priceMonth, price12 float64, months, slots int) float64 {
+	if months == 12 && price12 > 0 {
+		return price12 * float64(slots)
+	}
+	return priceMonth * float64(months) * float64(slots)
 }
 
 // ValidMonths: periode yang boleh dipilih saat aktivasi (dokumen bab 8: 1, 3, atau 12 bulan).

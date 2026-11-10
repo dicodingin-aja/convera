@@ -87,7 +87,7 @@ export default function QrScanPage({ themeStyle, workspace, onDone, onBack }) {
             <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--accent)', color: '#fff', fontSize: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>WhatsApp terhubung</div>
             {phone ? <div style={{ color: 'var(--muted)', fontSize: 13 }}>{String(phone).replace('****', '•••')}</div> : null}
-            <div style={{ color: 'var(--muted)', fontSize: 13 }}>Mengembalikan ke halaman Koneksi…</div>
+            <div style={{ color: 'var(--muted)', fontSize: 13 }}>Kembali ke halaman Koneksi…</div>
           </div>
         ) : null}
 
@@ -98,7 +98,7 @@ export default function QrScanPage({ themeStyle, workspace, onDone, onBack }) {
           {phase === 'expired' || phase === 'error' ? <button type="button" onClick={() => slug && begin(slug)} disabled={!slug} style={{ ...btn, background: 'var(--accent)', color: '#fff' }}>Buat QR baru</button> : null}
           {phase !== 'connected' ? <button type="button" onClick={cancel} style={{ ...btn, background: 'var(--surface2)', color: 'var(--text)' }}>Kembali ke Koneksi</button> : null}
         </div>
-        <span style={{ fontSize: 11, color: 'var(--muted)' }}>Convera hanya membaca pesan masuk dan tidak pernah mengirim pesan dari nomor Anda.</span>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>Convera hanya membaca pesan masuk dan tidak pernah mengirim pesan dari nomor kamu.</span>
       </div>
     </div>
   );

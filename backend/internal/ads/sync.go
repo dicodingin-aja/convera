@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/dicodingin-aja/convera/backend/internal/core"
 	"github.com/dicodingin-aja/convera/backend/internal/secure"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -89,11 +90,28 @@ ON CONFLICT (workspace_id, day, ad_id) DO UPDATE SET campaign_id = EXCLUDED.camp
 			return err
 		}
 	}
+	// Peta iklan -> kampanye untuk slot kampanye (tidak ikut terhapus saat koneksi diputus).
+	for _, r := range rows {
+		if r.CampaignID == "" || r.AdID == "" {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `
+INSERT INTO ad_campaign_map (workspace_id, ad_id, campaign_id, campaign_name, ad_name) VALUES ($1::uuid, $2, $3, NULLIF($4,''), NULLIF($5,''))
+ON CONFLICT (workspace_id, ad_id) DO UPDATE SET campaign_id = EXCLUDED.campaign_id,
+  campaign_name = COALESCE(EXCLUDED.campaign_name, ad_campaign_map.campaign_name), ad_name = COALESCE(EXCLUDED.ad_name, ad_campaign_map.ad_name), updated_at = now()`,
+			workspaceID, r.AdID, r.CampaignID, r.CampaignName, r.AdName); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.Exec(ctx, `UPDATE ad_connections SET status = 'connected', last_error = NULL, last_sync_at = now(), account_name = $2, currency = NULLIF($3,'')
 		WHERE workspace_id::text = $1`, workspaceID, acc.Name, acc.Currency); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+	// Target slot yang masih per iklan digabung ke kampanyenya.
+	return core.ConsolidateTracked(ctx, s.DB, workspaceID)
 }
 
 // handle mencatat kegagalan sinkronisasi. Token tidak valid menandai koneksi 'invalid' dan memberi tahu pemilik sekali.

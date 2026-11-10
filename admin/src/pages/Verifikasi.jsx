@@ -82,7 +82,7 @@ export default function Verifikasi() {
                 {p.status === 'pending' ? <Pill tone={kt}>{kl}</Pill> : p.status === 'approved' ? <Pill tone="ink">Diaktifkan</Pill> : <Pill>Ditolak</Pill>}
               </div>
               <div className="facts">
-                <div><span className="caps">Paket</span><b>{p.plan_name || '—'} · {p.months} bulan</b></div>
+                <div><span className="caps">{p.purchase === 'slots' ? 'Tambah slot' : 'Paket'}</span><b>{p.purchase === 'slots' ? '30 hari' : (p.plan_name || '—') + ' · ' + p.months + ' bulan'} · {p.ad_slots || 1} kampanye</b></div>
                 <div><span className="caps">Tagihan</span><b>{rp(p.billed)}</b></div>
                 <div><span className="caps">Diterima</span><b>{rp(p.received ?? p.billed)}</b></div>
               </div>

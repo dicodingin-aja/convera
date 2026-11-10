@@ -184,9 +184,9 @@ func (s *Server) putMaintenance(c *gin.Context) {
 			var was bool
 			_ = tx.QueryRow(c, `SELECT COALESCE((SELECT (value #>> '{}')::boolean FROM settings WHERE key = 'maintenance'), false)`).Scan(&was)
 			if was != *in.Enabled {
-				title, body := "Maintenance selesai", "Convera sudah kembali normal. Anda bisa membuat workspace dan event baru lagi."
+				title, body := "Maintenance selesai", "Convera sudah normal lagi. Kamu bisa membuat workspace dan event baru."
 				if *in.Enabled {
-					title, body = "Convera sedang maintenance", "Selama maintenance Anda hanya bisa memantau data; membuat workspace atau event baru dinonaktifkan sementara."
+					title, body = "Convera sedang maintenance", "Selama maintenance kamu hanya bisa melihat data. Workspace dan event baru belum bisa dibuat."
 					var m string
 					if in.Message != nil {
 						m = strings.TrimSpace(*in.Message)

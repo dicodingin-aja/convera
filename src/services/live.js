@@ -3,9 +3,9 @@
 // biaya iklan, ROAS, dan CPP hanya tampil bila Meta Ads tersambung (Marketing API); skor EMQ tidak ditampilkan, bukan dikarang.
 import { requestJson } from './api.js';
 
-// Integrasi Meta Ads (biaya, ROAS, CPP) dimatikan di sisi customer: pelanggan hanya mengisi Pixel ID + token CAPI.
-// Backend (/performance, /connections/ads) tetap ada; ubah ke true untuk menyalakan lagi (butuh bagian Meta Ads di Koneksi).
-export const ADS_ENABLED = false;
+// Integrasi Meta Ads (biaya, ROAS, CPP) di halaman Performa Iklan. Opsional untuk pelanggan: tanpa koneksi, setiap iklan
+// dihitung satu slot kampanye. Form koneksinya ada di KoneksiBackend.jsx (bagian "Akun Meta Ads").
+export const ADS_ENABLED = true;
 
 // ---------- Rentang tanggal (hari = Asia/Jakarta) ----------
 
@@ -143,7 +143,7 @@ export function buildLive(raw) {
   });
   const kv = raw.events.filter((e) => e.source !== 'test').map((e) => [
     tfmt(new Date(e.created_at)), e.lead_name || '—', fullPhone(e.phone) || maskUi(e.phone_masked) || '—', e.event_name, e.value || 0, SRC[e.source] || e.source, evStatus(e),
-    e.rule_name ? 'Aturan “' + e.rule_name + '”' : e.source === 'api' ? 'Sistem Anda (API)' : 'Tim Anda',
+    e.rule_name ? 'Aturan “' + e.rule_name + '”' : e.source === 'api' ? 'Sistem kamu (API)' : 'Tim kamu',
   ]);
   const log = raw.events.map((e, i) => ({
     i, ev: e.event_name, st: evStatus(e), src: SRC[e.source] || e.source, d: new Date(e.created_at), value: e.value || 0,
@@ -162,12 +162,12 @@ export function liveTimeline(live, dl, tf, rp) {
   if (!d) { TL.push(['Chat masuk', tf(dl.clickAt)]); TL.push(['Memuat riwayat…', '']); return TL; }
   const msgs = d.messages || [];
   if (!msgs.length) TL.push(['Chat masuk', tf(dl.clickAt)]);
-  msgs.forEach((m) => TL.push([(m.direction === 'in' ? 'Pelanggan' : 'Anda') + ' · “' + m.body + '”', tf(new Date(m.sent_at))]));
+  msgs.forEach((m) => TL.push([(m.direction === 'in' ? 'Pelanggan' : 'Kamu') + ' · “' + m.body + '”', tf(new Date(m.sent_at))]));
   d.events.slice().reverse().forEach((e) => {
     const st = evStatus(e);
     TL.push([e.event_name + ' ' + st.toLowerCase() + (e.value ? ' · ' + rp(e.value) : '') + (e.error_message && e.status === 'failed' ? ' — ' + e.error_message : ''), tf(new Date(e.sent_at || e.event_time))]);
   });
-  if (dl.organic) TL.push(['Tidak dikirim ke Meta — chat organik tanpa ctwa_clid', '']);
+  if (dl.organic) TL.push(['Tidak dikirim ke Meta: chat ini bukan dari iklan', '']);
   return TL;
 }
 
@@ -276,9 +276,9 @@ export function liveOverview(live, h) {
 
   const testSent = raw.events.some((e) => e.source === 'test' && e.status === 'sent');
   const stepsRaw = [
-    ['Buat workspace', 'Workspace Anda sudah dibuat', true],
+    ['Buat workspace', 'Workspace sudah dibuat', true],
     ['Hubungkan Meta Dataset', 'Dataset & access token untuk Conversions API', !!hl.configured, 'Hubungkan', 'koneksi'],
-    ['Hubungkan WhatsApp', 'Agar chat dari iklan tercatat sebagai Lead', !!hl.last_message_at, 'Hubungkan', 'koneksi'],
+    ['Hubungkan WhatsApp', 'Supaya chat dari iklan tercatat sebagai Lead', !!hl.last_message_at, 'Hubungkan', 'koneksi'],
     ['Pilih cara kirim konversi', 'API, tandai manual, atau aturan otomatis', live.rules.length > 0 || raw.events.some((e) => ['manual', 'api'].includes(e.source)), 'Atur', 'aturan'],
     ['Kirim event percobaan', 'Pastikan event muncul di Meta Test Events', testSent, 'Kirim tes', 'koneksi'],
   ];

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dicodingin-aja/convera/backend/internal/core"
 	"github.com/dicodingin-aja/convera/backend/internal/meta"
 	"github.com/dicodingin-aja/convera/backend/internal/secure"
 	"github.com/jackc/pgx/v5"
@@ -96,6 +97,34 @@ RETURNING id::text, workspace_id::text, lead_id::text, event_id, event_name, eve
 }
 
 func (d *Dispatcher) process(ctx context.Context, j job) error {
+	// Workspace yang belum dibayar atau langganannya berakhir: event tidak dikirim ke Meta.
+	if ok, err := core.WorkspaceAccess(ctx, d.DB, j.WorkspaceID); err != nil {
+		return err
+	} else if !ok {
+		_, err := d.DB.Exec(ctx, `UPDATE events SET status='skipped', error_code='subscription_inactive',
+			error_message='Langganan workspace tidak aktif; event tidak dikirim ke Meta.', next_retry_at=NULL WHERE id=$1`, j.ID)
+		return err
+	}
+	// Event dari chat iklan hanya dikirim bila kampanyenya memakai slot (slot kosong diisi otomatis).
+	// Event tanpa iklan (organik) dan event uji tidak memakai slot.
+	if j.LeadID != nil && j.Source != "test" {
+		var adID *string
+		if err := d.DB.QueryRow(ctx, `SELECT ad_id FROM leads WHERE id = $1`, *j.LeadID).Scan(&adID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if adID != nil && *adID != "" {
+			ok, err := core.EnsureAdTracked(ctx, d.DB, j.WorkspaceID, *adID)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				_, err := d.DB.Exec(ctx, `UPDATE events SET status='skipped', error_code='ad_not_tracked',
+					error_message='Slot penuh, kampanye ini belum dilacak. Tambah slot atau pilih kampanye ini di Performa Iklan.',
+					next_retry_at=NULL WHERE id=$1`, j.ID)
+				return err
+			}
+		}
+	}
 	var (
 		connMode, status        string
 		pixel, testCode, wabaID *string

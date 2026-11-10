@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dicodingin-aja/convera/backend/internal/billing"
+	"github.com/dicodingin-aja/convera/backend/internal/core"
 	"github.com/dicodingin-aja/convera/backend/internal/httpx"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -169,7 +170,7 @@ func (s *Server) getCustomer(c *gin.Context) {
 	}
 	cust := rows[0]
 	pays, err := httpx.Query(c, s.DB, `
-SELECT pay.id::text AS id, pay.paid_at, pay.amount::float8 AS amount, pay.months, pay.period_start, pay.period_end,
+SELECT pay.id::text AS id, pay.paid_at, pay.amount::float8 AS amount, pay.months, pay.period_start, pay.period_end, pay.ad_slots, pay.purchase,
        p.code AS plan, p.name AS plan_name, sp.name AS sales, pay.payment_proof_id IS NOT NULL AS from_proof
 FROM payments pay JOIN plans p ON p.id = pay.plan_id JOIN sales_people sp ON sp.id = pay.sales_id
 WHERE pay.workspace_id::text = $1 ORDER BY pay.paid_at DESC LIMIT 100`, c.Param("id"))
@@ -194,6 +195,14 @@ SELECT (SELECT count(*) FROM leads WHERE workspace_id::text = $1 AND deleted_at 
 		return
 	}
 	cust["payments"] = pays
+	if cust["ad_slots"], err = core.SlotQuota(c, s.DB, c.Param("id")); err != nil {
+		httpx.ServerError(c, err)
+		return
+	}
+	if cust["ad_slots_used"], err = core.SlotUsage(c, s.DB, c.Param("id")); err != nil {
+		httpx.ServerError(c, err)
+		return
+	}
 	diag, err := s.customerDiagnostics(c, c.Param("id"))
 	if err != nil {
 		httpx.ServerError(c, err)
@@ -236,12 +245,15 @@ type activation struct {
 	Amount      int64
 	SalesID     string
 	ProofID     string
+	AdSlots     int    // jumlah slot kampanye yang dibeli (min. 1)
+	Purchase    string // 'subscription' (default) atau 'slots' (tambah slot 30 hari, langganan tidak berubah)
 }
 
 var (
-	errNoPlan  = errors.New("paket tidak ditemukan")
-	errNoSales = errors.New("sales tidak ditemukan atau tidak aktif")
-	errNoWS    = errors.New("customer tidak ditemukan")
+	errNoPlan   = errors.New("paket tidak ditemukan")
+	errNoSales  = errors.New("sales tidak ditemukan atau tidak aktif")
+	errNoWS     = errors.New("customer tidak ditemukan")
+	errNoAccess = errors.New("tambah slot hanya untuk langganan yang sedang aktif")
 )
 
 // activate membuat payment dan memperpanjang langganan di dalam transaksi tx:
@@ -272,16 +284,40 @@ func (s *Server) activate(c *gin.Context, tx pgx.Tx, a activation) (end time.Tim
 		return end, mapNoRows(err, errNoWS)
 	}
 	now := time.Now().UTC()
-	base := curEnd
-	if status != "active" {
-		base = nil
+	if a.AdSlots < 1 {
+		a.AdSlots = 1
 	}
-	start, end := billing.NextPeriod(now, base, a.Months)
+	if a.Purchase == "" {
+		a.Purchase = "subscription"
+	}
+	var start time.Time
+	if a.Purchase == "slots" {
+		// Tambah slot: berlaku 30 hari sejak disetujui, berjalan sendiri; langganan utama tidak berubah.
+		ok, err := core.WorkspaceAccess(c, tx, a.WorkspaceID)
+		if err != nil {
+			return end, err
+		}
+		if !ok {
+			return end, errNoAccess
+		}
+		a.Months = 1
+		start, end = now, now.AddDate(0, 0, billing.DaysPerMonth)
+	} else {
+		base := curEnd
+		if status != "active" {
+			base = nil
+		}
+		start, end = billing.NextPeriod(now, base, a.Months)
+	}
 	if _, err = tx.Exec(c, `
 INSERT INTO payments (workspace_id, subscription_id, plan_id, payment_proof_id, amount, months, period_start, period_end,
-                      paid_at, sales_id, komisi_pct, kas_pct, approved_by)
-VALUES ($1::uuid, $2::uuid, $3::uuid, NULLIF($4,'')::uuid, $5, $6, $7, $8, $9, $10::uuid, $11, $12, $13::uuid)`,
-		a.WorkspaceID, subID, planID, a.ProofID, a.Amount, a.Months, start, end, now, a.SalesID, komisi, kas, adminID(c)); err != nil {
+                      paid_at, sales_id, komisi_pct, kas_pct, approved_by, ad_slots, purchase)
+VALUES ($1::uuid, $2::uuid, $3::uuid, NULLIF($4,'')::uuid, $5, $6, $7, $8, $9, $10::uuid, $11, $12, $13::uuid, $14, $15)`,
+		a.WorkspaceID, subID, planID, a.ProofID, a.Amount, a.Months, start, end, now, a.SalesID, komisi, kas, adminID(c), a.AdSlots, a.Purchase); err != nil {
+		return end, err
+	}
+	if a.Purchase == "slots" {
+		_, err = tx.Exec(c, `UPDATE subscriptions SET sales_id = COALESCE(sales_id, $2::uuid) WHERE id::text = $1`, subID, a.SalesID)
 		return end, err
 	}
 	_, err = tx.Exec(c, `UPDATE subscriptions SET status = 'active', plan_id = $2::uuid, current_period_end = $3,
@@ -297,10 +333,12 @@ func mapNoRows(err, to error) error {
 }
 
 type extendInput struct {
-	Plan    string  `json:"plan"`
-	Months  int     `json:"months"`
-	Amount  float64 `json:"amount"`
-	SalesID string  `json:"sales_id"`
+	Plan     string  `json:"plan"`
+	Months   int     `json:"months"`
+	Amount   float64 `json:"amount"`
+	SalesID  string  `json:"sales_id"`
+	AdSlots  int     `json:"ad_slots"` // 0 = ikut bukti transfer (approve) atau 1 (perpanjang manual)
+	Purchase string  `json:"purchase"` // '' = ikut bukti transfer / 'subscription'; 'slots' = tambah slot 30 hari
 }
 
 // validate memeriksa input aktivasi dan menjawab 422 bila salah.
@@ -328,6 +366,8 @@ func activationError(c *gin.Context, err error) bool {
 	switch {
 	case errors.Is(err, errNoPlan), errors.Is(err, errNoSales):
 		httpx.Fail(c, http.StatusUnprocessableEntity, "validation_error", err.Error()+".")
+	case errors.Is(err, errNoAccess):
+		httpx.Fail(c, http.StatusUnprocessableEntity, "validation_error", "Tambah slot hanya untuk langganan yang sedang aktif. Perpanjang langganannya dulu.")
 	case errors.Is(err, errNoWS):
 		httpx.Fail(c, http.StatusNotFound, "customer_not_found", "Customer tidak ditemukan.")
 	default:
@@ -352,7 +392,8 @@ func (s *Server) extendCustomer(c *gin.Context) {
 		return
 	}
 	defer tx.Rollback(c)
-	end, err := s.activate(c, tx, activation{WorkspaceID: c.Param("id"), PlanCode: in.Plan, Months: in.Months, Amount: amount, SalesID: in.SalesID})
+	end, err := s.activate(c, tx, activation{WorkspaceID: c.Param("id"), PlanCode: in.Plan, Months: in.Months, Amount: amount, SalesID: in.SalesID,
+		AdSlots: in.AdSlots, Purchase: in.Purchase})
 	if activationError(c, err) {
 		return
 	} else if err != nil {
@@ -360,12 +401,12 @@ func (s *Server) extendCustomer(c *gin.Context) {
 		return
 	}
 	if err := s.notifyOwner(c, tx, c.Param("id"), "subscription_active", "Langganan aktif",
-		fmt.Sprintf("Langganan Anda aktif sampai %s.", end.In(jakarta()).Format("2 Jan 2006")), "/langganan"); err != nil {
+		fmt.Sprintf("Langganan kamu aktif sampai %s.", end.In(jakarta()).Format("2 Jan 2006")), "/langganan"); err != nil {
 		httpx.ServerError(c, err)
 		return
 	}
 	if err := s.audit(c, tx, "customer.extend", c.Param("id"), "workspace", c.Param("id"),
-		map[string]any{"plan": in.Plan, "months": in.Months, "amount": amount, "sales_id": in.SalesID, "period_end": end}); err != nil {
+		map[string]any{"plan": in.Plan, "months": in.Months, "amount": amount, "sales_id": in.SalesID, "period_end": end, "ad_slots": in.AdSlots, "purchase": in.Purchase}); err != nil {
 		httpx.ServerError(c, err)
 		return
 	}

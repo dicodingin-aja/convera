@@ -14,7 +14,7 @@ import (
 )
 
 const proofCols = `pp.id::text AS id, pp.workspace_id::text AS workspace_id, w.name AS customer, u.name AS owner, u.phone, w.city,
-  pp.kind, pl.code AS plan, pl.name AS plan_name, pp.months, pp.bank, pp.sender, pp.ref,
+  pp.kind, pp.purchase, pp.ad_slots, pl.code AS plan, pl.name AS plan_name, pp.months, pp.bank, pp.sender, pp.ref,
   pp.billed::float8 AS billed, pp.received::float8 AS received,
   (pp.received IS NOT NULL AND pp.received <> pp.billed) AS amount_mismatch,
   ba.bank || ' ' || ba.number AS to_bank, pp.message, pp.status, pp.reject_reason,
@@ -93,8 +93,10 @@ func (s *Server) approveProof(c *gin.Context) {
 	}
 	defer tx.Rollback(c)
 
-	var ws, status string
-	err = tx.QueryRow(c, `SELECT workspace_id::text, status FROM payment_proofs WHERE id::text = $1 AND deleted_at IS NULL FOR UPDATE`, c.Param("id")).Scan(&ws, &status)
+	var ws, status, purchase string
+	var proofSlots int
+	err = tx.QueryRow(c, `SELECT workspace_id::text, status, purchase, ad_slots FROM payment_proofs WHERE id::text = $1 AND deleted_at IS NULL FOR UPDATE`, c.Param("id")).
+		Scan(&ws, &status, &purchase, &proofSlots)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Fail(c, http.StatusNotFound, "proof_not_found", "Bukti transfer tidak ditemukan.")
 		return
@@ -106,7 +108,15 @@ func (s *Server) approveProof(c *gin.Context) {
 		httpx.Fail(c, http.StatusConflict, "already_decided", "Bukti transfer ini sudah diputuskan.")
 		return
 	}
-	end, err := s.activate(c, tx, activation{WorkspaceID: ws, PlanCode: in.Plan, Months: in.Months, Amount: amount, SalesID: in.SalesID, ProofID: c.Param("id")})
+	// Jumlah slot dan jenis pembelian mengikuti bukti transfer, kecuali admin mengubah jumlah slotnya.
+	if in.AdSlots < 1 {
+		in.AdSlots = proofSlots
+	}
+	if in.Purchase == "" {
+		in.Purchase = purchase
+	}
+	end, err := s.activate(c, tx, activation{WorkspaceID: ws, PlanCode: in.Plan, Months: in.Months, Amount: amount, SalesID: in.SalesID, ProofID: c.Param("id"),
+		AdSlots: in.AdSlots, Purchase: in.Purchase})
 	if activationError(c, err) {
 		return
 	} else if err != nil {
@@ -118,13 +128,16 @@ func (s *Server) approveProof(c *gin.Context) {
 		httpx.ServerError(c, err)
 		return
 	}
-	if err := s.notifyOwner(c, tx, ws, "payment_approved", "Pembayaran diterima",
-		fmt.Sprintf("Langganan Anda aktif sampai %s.", end.In(jakarta()).Format("2 Jan 2006")), "/langganan"); err != nil {
+	body := fmt.Sprintf("Langganan kamu aktif sampai %s (%d slot kampanye).", end.In(jakarta()).Format("2 Jan 2006"), in.AdSlots)
+	if in.Purchase == "slots" {
+		body = fmt.Sprintf("%d slot kampanye tambahan aktif sampai %s.", in.AdSlots, end.In(jakarta()).Format("2 Jan 2006"))
+	}
+	if err := s.notifyOwner(c, tx, ws, "payment_approved", "Pembayaran diterima", body, "/langganan"); err != nil {
 		httpx.ServerError(c, err)
 		return
 	}
 	if err := s.audit(c, tx, "payment_proof.approve", ws, "payment_proof", c.Param("id"),
-		map[string]any{"plan": in.Plan, "months": in.Months, "amount": amount, "sales_id": in.SalesID, "period_end": end}); err != nil {
+		map[string]any{"plan": in.Plan, "months": in.Months, "amount": amount, "sales_id": in.SalesID, "period_end": end, "ad_slots": in.AdSlots, "purchase": in.Purchase}); err != nil {
 		httpx.ServerError(c, err)
 		return
 	}

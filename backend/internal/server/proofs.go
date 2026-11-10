@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/dicodingin-aja/convera/backend/internal/billing"
+	"github.com/dicodingin-aja/convera/backend/internal/core"
 	"github.com/dicodingin-aja/convera/backend/internal/upload"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -36,6 +37,18 @@ FROM subscriptions sub LEFT JOIN plans p ON p.id = sub.plan_id WHERE sub.workspa
 		fail(c, http.StatusNotFound, "no_subscription", "Langganan tidak ditemukan.")
 		return
 	}
+	quota, err := core.SlotQuota(c, s.DB, wsID(c))
+	if err != nil {
+		serverError(c, err)
+		return
+	}
+	used, err := core.SlotUsage(c, s.DB, wsID(c))
+	if err != nil {
+		serverError(c, err)
+		return
+	}
+	rows[0]["ad_slots"] = quota
+	rows[0]["ad_slots_used"] = used
 	ok(c, rows[0])
 }
 
@@ -52,7 +65,7 @@ func (s *Server) customerBanks(c *gin.Context) {
 // listMyProofs: riwayat bukti transfer workspace ini (tanpa nama berkas internal).
 func (s *Server) listMyProofs(c *gin.Context) {
 	rows, err := query(c, s.DB, `
-SELECT pp.id::text AS id, pp.kind, pl.name AS plan_name, pp.months, pp.billed::float8 AS billed, pp.received::float8 AS received,
+SELECT pp.id::text AS id, pp.kind, pp.purchase, pp.ad_slots, pl.name AS plan_name, pp.months, pp.billed::float8 AS billed, pp.received::float8 AS received,
        pp.status, pp.reject_reason, pp.created_at, pp.decided_at
 FROM payment_proofs pp LEFT JOIN plans pl ON pl.id = pp.plan_id
 WHERE pp.workspace_id = $1 AND pp.deleted_at IS NULL ORDER BY pp.created_at DESC LIMIT 50`, wsID(c))
@@ -66,7 +79,8 @@ WHERE pp.workspace_id = $1 AND pp.deleted_at IS NULL ORDER BY pp.created_at DESC
 // ---------- Unggah bukti transfer ----------
 
 // uploadProof menerima multipart/form-data: file (JPG/PNG/PDF, maks. 5 MB) + plan, months, bank, sender,
-// ref?, amount?, bank_account_id?, message?. Jenis berkas ditentukan dari ISINYA, nama file acak, disimpan privat.
+// ref?, amount?, bank_account_id?, message?, ad_slots? (jumlah slot kampanye, default 1), purchase? ('subscription'
+// default, atau 'slots' = tambah slot 30 hari di tengah langganan yang berjalan). Jenis berkas ditentukan dari ISINYA, nama file acak, disimpan privat.
 // Tagihan (billed) dihitung server dari harga paket; nominal dari customer (amount) hanya klaim untuk dicocokkan admin.
 func (s *Server) uploadProof(c *gin.Context) {
 	if !s.limiter("proof|"+c.GetString("user_id"), 10.0/3600, 5).Allow() { // maks. 10 unggahan/jam, burst 5
@@ -146,6 +160,25 @@ func (s *Server) uploadProof(c *gin.Context) {
 
 	// ----- validasi isian -----
 	months, _ := strconv.Atoi(fields["months"])
+	slots := 1
+	if v := fields["ad_slots"]; v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > billing.MaxAdSlots {
+			bad422(c, fmt.Sprintf("Jumlah slot kampanye harus 1 sampai %d.", billing.MaxAdSlots))
+			return
+		}
+		slots = n
+	}
+	purchase := fields["purchase"]
+	switch purchase {
+	case "", "subscription":
+		purchase = "subscription"
+	case "slots":
+		months = 1 // tambah slot selalu 30 hari
+	default:
+		bad422(c, "purchase harus 'subscription' atau 'slots'.")
+		return
+	}
 	var declared *float64
 	if v := fields["amount"]; v != "" {
 		f, err := strconv.ParseFloat(v, 64)
@@ -195,9 +228,18 @@ func (s *Server) uploadProof(c *gin.Context) {
 		}
 		return
 	}
-	billed := pm * float64(months)
-	if months == 12 && p12 > 0 {
-		billed = p12
+	billed := billing.ProofPrice(pm, p12, months, slots)
+	if purchase == "slots" {
+		// Tambah slot hanya untuk langganan yang sedang berjalan; selain itu bayar langganan biasa.
+		access, err := core.WorkspaceAccess(c, tx, wsID(c))
+		if err != nil {
+			serverError(c, err)
+			return
+		}
+		if !access {
+			bad422(c, "Tambah slot hanya untuk langganan yang sedang aktif. Bayar langganan dulu.")
+			return
+		}
 	}
 	if id := fields["bank_account_id"]; id != "" {
 		var okBank bool
@@ -232,18 +274,19 @@ func (s *Server) uploadProof(c *gin.Context) {
 	var id string
 	if err := tx.QueryRow(c, `
 INSERT INTO payment_proofs (workspace_id, uploaded_by, kind, plan_id, months, bank, sender, ref, billed, received, to_bank_account_id,
-                            file_key, file_mime, file_size, message)
-VALUES ($1, $2::uuid, $3, $4::uuid, $5, $6, $7, NULLIF($8,''), $9, $10, NULLIF($11,'')::uuid, $12, $13, $14, NULLIF($15,''))
+                            file_key, file_mime, file_size, message, ad_slots, purchase)
+VALUES ($1, $2::uuid, $3, $4::uuid, $5, $6, $7, NULLIF($8,''), $9, $10, NULLIF($11,'')::uuid, $12, $13, $14, NULLIF($15,''), $16, $17)
 RETURNING id::text`,
 		wsID(c), c.GetString("user_id"), kind, planID, months, fields["bank"], fields["sender"], fields["ref"], billed, declared,
-		fields["bank_account_id"], key, mime, size, fields["message"]).Scan(&id); err != nil {
+		fields["bank_account_id"], key, mime, size, fields["message"], slots, purchase).Scan(&id); err != nil {
 		serverError(c, err)
 		return
 	}
 	// Langganan jadi 'pending' (menunggu verifikasi), kecuali sudah dihentikan admin atau masih aktif dengan sisa waktu
 	// (perpanjang lebih awal tidak boleh membuat langganan yang masih berjalan tampak tertunda).
+	// Tambah slot tidak mengubah status langganan.
 	if _, err := tx.Exec(c, `UPDATE subscriptions SET status = 'pending'
-		WHERE workspace_id = $1 AND status NOT IN ('stopped', 'pending') AND NOT (status = 'active' AND current_period_end > now())`, wsID(c)); err != nil {
+		WHERE workspace_id = $1 AND $2 = 'subscription' AND status NOT IN ('stopped', 'pending') AND NOT (status = 'active' AND current_period_end > now())`, wsID(c), purchase); err != nil {
 		serverError(c, err)
 		return
 	}
@@ -253,7 +296,7 @@ RETURNING id::text`,
 		serverError(c, err)
 		return
 	}
-	detail, _ := json.Marshal(map[string]any{"months": months, "plan": fields["plan"], "kind": kind, "file_mime": mime, "file_size": size})
+	detail, _ := json.Marshal(map[string]any{"months": months, "plan": fields["plan"], "kind": kind, "purchase": purchase, "ad_slots": slots, "file_mime": mime, "file_size": size})
 	if _, err := tx.Exec(c, `INSERT INTO audit_logs (actor_type, actor_id, actor_label, workspace_id, action, target_type, target_id, detail, ip)
 		SELECT 'user', u.id, u.name, $2::uuid, 'payment_proof.upload', 'payment_proof', $3, $4, NULLIF($5,'')::inet FROM users u WHERE u.id = $1::uuid`,
 		c.GetString("user_id"), wsID(c), id, detail, c.ClientIP()); err != nil {
@@ -265,7 +308,7 @@ RETURNING id::text`,
 		return
 	}
 	committed = true
-	okStatus(c, http.StatusCreated, gin.H{"id": id, "status": "pending", "kind": kind, "months": months, "billed": billed, "file_size": size})
+	okStatus(c, http.StatusCreated, gin.H{"id": id, "status": "pending", "kind": kind, "purchase": purchase, "ad_slots": slots, "months": months, "billed": billed, "file_size": size})
 }
 
 func bad422(c *gin.Context, msg string) {

@@ -87,6 +87,14 @@ export const syncAdsConnection = async (workspace, full = false) =>
 export const deleteAdsConnection = async (workspace) =>
   (await requestJson('/api/v1/connections/ads', { method: 'DELETE', workspace }))?.data;
 
+// ---- Slot kampanye iklan (harga per kampanye per 30 hari) ----
+
+export const getAdSlots = async (workspace) => (await requestJson('/api/v1/ad-slots', { workspace }))?.data;
+export const trackAdSlot = async (workspace, kind, id) =>
+  (await requestJson('/api/v1/ad-slots/track', { method: 'POST', workspace, body: JSON.stringify({ kind, id }) }))?.data;
+export const releaseAdSlot = async (workspace, kind, id) =>
+  (await requestJson('/api/v1/ad-slots/release', { method: 'POST', workspace, body: JSON.stringify({ kind, id }) }))?.data;
+
 // ---- Langganan & bukti transfer ----
 
 export const getPlans = async () => (await requestJson('/api/v1/plans'))?.data || [];
@@ -94,7 +102,8 @@ export const getBankAccounts = async (workspace) => (await requestJson('/api/v1/
 export const getSubscription = async (workspace) => (await requestJson('/api/v1/subscription', { workspace }))?.data;
 export const getMyProofs = async (workspace) => (await requestJson('/api/v1/payment-proofs', { workspace }))?.data || [];
 
-// formData: plan, months, bank, sender, ref?, amount?, bank_account_id?, message?, file (JPG/PNG/PDF, maks. 5 MB)
+// formData: plan, months, bank, sender, ref?, amount?, bank_account_id?, message?, ad_slots?, purchase? ('subscription' | 'slots'),
+// file (JPG/PNG/PDF, maks. 5 MB)
 export const uploadProof = async (workspace, formData) =>
   (await requestJson('/api/v1/payment-proofs', { method: 'POST', workspace, body: formData }))?.data;
 

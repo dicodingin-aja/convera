@@ -82,7 +82,9 @@ export function LaporanPage({ slug, workspaceName }) {
   const [source, setSource] = useState('');
   const [status, setStatus] = useState('');
   const { loading, error, data } = useReport(slug, { month, source, status });
-  const days = data?.days || [];
+  // Hari yang belum lewat tidak ditampilkan (isinya pasti 0).
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+  const days = (data?.days || []).filter((d) => d.date <= today);
   const total = data?.total;
   const current = ymKey();
 

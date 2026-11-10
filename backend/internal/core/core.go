@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dicodingin-aja/convera/backend/internal/billing"
 	"github.com/dicodingin-aja/convera/backend/internal/meta"
 	"github.com/dicodingin-aja/convera/backend/internal/wa"
 	"github.com/jackc/pgx/v5"
@@ -290,13 +291,13 @@ type Message struct {
 	LeadSource string // webhook | qr
 }
 
-// ProcessMessage dipanggil di dalam transaksi. Idempoten berdasarkan (provider, message_id).
+// ProcessMessage dipanggil di dalam transaksi. Idempoten berdasarkan (workspace, provider, message_id).
 // Mengembalikan error hanya untuk kegagalan tak terduga (agar transaksi di-rollback dan pengirim mengulang);
 // kegagalan aturan individual dicatat ringkas di webhook_inbox.error tanpa isi pesan.
 func ProcessMessage(ctx context.Context, tx DBTX, workspaceID string, m Message) (processed bool, err error) {
 	tag, err := tx.Exec(ctx, `
 INSERT INTO webhook_inbox (workspace_id, provider, message_id, direction) VALUES ($1,$2,$3,$4)
-ON CONFLICT (provider, message_id) DO NOTHING`, workspaceID, m.Provider, m.ID, m.Direction)
+ON CONFLICT (workspace_id, provider, message_id) DO NOTHING`, workspaceID, m.Provider, m.ID, m.Direction)
 	if err != nil {
 		return false, err
 	}
@@ -324,7 +325,7 @@ ON CONFLICT (provider, message_id) DO NOTHING`, workspaceID, m.Provider, m.ID, m
 	if len(matches) == 0 {
 		// Pesan tanpa trigger tidak membuat lead, event, atau salinan isi pesan.
 		_, err = tx.Exec(ctx, `UPDATE webhook_inbox SET processed_at = now(), error = NULL
-		                       WHERE provider = $1 AND message_id = $2`, m.Provider, m.ID)
+		                       WHERE workspace_id = $3 AND provider = $1 AND message_id = $2`, m.Provider, m.ID, workspaceID)
 		return true, err
 	}
 
@@ -368,7 +369,7 @@ ON CONFLICT (provider, message_id) DO NOTHING`, workspaceID, m.Provider, m.ID, m
 		}
 	}
 	_, err = tx.Exec(ctx, `UPDATE webhook_inbox SET processed_at = now(), error = NULLIF($3,'')
-	                       WHERE provider = $1 AND message_id = $2`, m.Provider, m.ID, strings.Join(problems, "; "))
+	                       WHERE workspace_id = $4 AND provider = $1 AND message_id = $2`, m.Provider, m.ID, strings.Join(problems, "; "), workspaceID)
 	return true, err
 }
 
@@ -378,4 +379,20 @@ func truncRunes(s string, n int) string {
 		return s
 	}
 	return string(r[:n])
+}
+
+// ---------- Akses langganan ----------
+
+// ErrSubscriptionInactive: workspace belum dibayar atau langganannya sudah berakhir.
+var ErrSubscriptionInactive = errors.New("langganan workspace tidak aktif")
+
+// WorkspaceAccess melaporkan apakah workspace boleh memakai fitur (lihat billing.AccessSQL).
+// Workspace yang tidak ada atau tanpa baris langganan dianggap tidak punya akses.
+func WorkspaceAccess(ctx context.Context, db DBTX, workspaceID string) (bool, error) {
+	var ok bool
+	err := db.QueryRow(ctx, `SELECT `+billing.AccessSQL+` FROM subscriptions sub WHERE sub.workspace_id::text = $1`, workspaceID).Scan(&ok)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return ok, err
 }

@@ -42,14 +42,41 @@ func TestNextPeriod(t *testing.T) {
 	}
 	// sudah lewat: mulai dari sekarang
 	old := d("2026-10-01 10:00")
-	s, e = NextPeriod(now, &old, 3)
-	if !s.Equal(now) || !e.Equal(d("2027-02-05 10:00")) {
+	s, e = NextPeriod(now, &old, 3) // 3 x 30 hari
+	if !s.Equal(now) || !e.Equal(d("2027-02-03 10:00")) {
 		t.Errorf("lewat: %v - %v", s, e)
 	}
 	// belum pernah berlangganan
 	s, _ = NextPeriod(now, nil, 1)
 	if !s.Equal(now) {
 		t.Error("nil harus mulai dari sekarang")
+	}
+	// 1 bulan = 30 hari, termasuk melewati Februari; 12 bulan = 360 hari
+	jan := d("2027-01-31 10:00")
+	if _, e = NextPeriod(jan, nil, 1); !e.Equal(d("2027-03-02 10:00")) {
+		t.Errorf("31 Jan + 30 hari = %v; want 2 Mar", e)
+	}
+	if _, e = NextPeriod(now, nil, 12); !e.Equal(now.AddDate(0, 0, 360)) {
+		t.Errorf("12 bulan = %v; want +360 hari", e)
+	}
+}
+
+func TestProofPrice(t *testing.T) {
+	cases := []struct {
+		pm, p12       float64
+		months, slots int
+		want          float64
+	}{
+		{150000, 1500000, 1, 1, 150000},
+		{150000, 1500000, 1, 3, 450000},
+		{150000, 1500000, 3, 2, 900000},
+		{150000, 1500000, 12, 2, 3000000}, // harga 12 bulan per slot
+		{150000, 0, 12, 1, 1800000},       // tanpa harga 12 bulan
+	}
+	for _, c := range cases {
+		if got := ProofPrice(c.pm, c.p12, c.months, c.slots); got != c.want {
+			t.Errorf("ProofPrice(%v,%v,%d,%d) = %v; want %v", c.pm, c.p12, c.months, c.slots, got, c.want)
+		}
 	}
 }
 

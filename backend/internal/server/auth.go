@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/subtle"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/dicodingin-aja/convera/backend/internal/billing"
 	"github.com/dicodingin-aja/convera/backend/internal/core"
 	"github.com/dicodingin-aja/convera/backend/internal/secure"
 	"github.com/dicodingin-aja/convera/backend/internal/wa"
@@ -405,6 +407,12 @@ func (s *Server) createWorkspace(c *gin.Context) {
 		}
 		var id string
 		err = s.createWorkspaceTx(c, c.GetString("user_id"), cand, in.Name, in.Category, in.City, verify, &id)
+		var unpaid *unpaidWorkspaceError
+		if errors.As(err, &unpaid) {
+			fail(c, http.StatusConflict, "unpaid_workspace", fmt.Sprintf(
+				"Workspace %q belum dibayar. Bayar langganan workspace itu atau hapus dulu sebelum membuat workspace baru.", unpaid.name))
+			return
+		}
 		if isUnique(err) {
 			if in.Slug != "" && attempt == 0 {
 				fail(c, http.StatusConflict, "slug_taken", "Slug sudah dipakai.")
@@ -415,7 +423,10 @@ func (s *Server) createWorkspace(c *gin.Context) {
 			serverError(c, err)
 			return
 		}
-		okStatus(c, http.StatusCreated, gin.H{"id": id, "slug": cand, "name": in.Name})
+		var status string
+		_ = s.DB.QueryRow(c, `SELECT status FROM subscriptions WHERE workspace_id = $1`, id).Scan(&status)
+		// subscription_status: 'trial' untuk workspace pertama, 'expired' (wajib bayar) untuk berikutnya.
+		okStatus(c, http.StatusCreated, gin.H{"id": id, "slug": cand, "name": in.Name, "subscription_status": status})
 		return
 	}
 	fail(c, http.StatusConflict, "slug_taken", "Slug sudah dipakai.")
@@ -443,6 +454,20 @@ func (s *Server) createWorkspaceTx(ctx context.Context, userID, slug, name, cate
 		return err
 	}
 	if hadTrial {
+		// Setelah trial, workspace baru wajib dibayar. Selama masih ada workspace yang belum pernah dibayar dan
+		// tidak punya akses (mis. workspace baru yang belum dibayar, atau trial yang habis tanpa bayar), akun tidak
+		// boleh membuat workspace lain: bayar atau hapus workspace itu dulu.
+		var unpaid string
+		err := tx.QueryRow(ctx, `SELECT x.name FROM workspaces x JOIN subscriptions sub ON sub.workspace_id = x.id
+			WHERE x.owner_user_id = $1 AND x.id <> $2 AND x.deleted_at IS NULL
+			  AND NOT (`+billing.AccessSQL+`)
+			  AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.workspace_id = x.id)
+			ORDER BY x.created_at LIMIT 1`, userID, *id).Scan(&unpaid)
+		if err == nil {
+			return &unpaidWorkspaceError{name: unpaid}
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `INSERT INTO subscriptions (workspace_id, status) VALUES ($1, 'expired')`, *id); err != nil {
 			return err
 		}
@@ -456,6 +481,11 @@ VALUES ($1, 'trial', now() + make_interval(days => COALESCE((SELECT (value #>> '
 	}
 	return tx.Commit(ctx)
 }
+
+// unpaidWorkspaceError: akun masih punya workspace yang belum pernah dibayar (lihat createWorkspaceTx).
+type unpaidWorkspaceError struct{ name string }
+
+func (e *unpaidWorkspaceError) Error() string { return "workspace belum dibayar: " + e.name }
 
 func firstNonEmpty(a ...string) string {
 	for _, s := range a {

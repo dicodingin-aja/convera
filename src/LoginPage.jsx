@@ -35,13 +35,13 @@ export default function LoginPage({ themeStyle, onLogin }) {
           <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.035em' }}>Convera</span>
         </div>
         <div>
-          <h1 style={{ margin: 0, fontSize: 20 }}>{mode === 'register' ? 'Buat akun baru' : 'Masuk ke akun Anda'}</h1>
-          <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 13 }}>Lihat performa iklan WhatsApp dan kelola event konversi.</p>
+          <h1 style={{ margin: 0, fontSize: 20 }}>{mode === 'register' ? 'Buat akun baru' : 'Masuk ke akun kamu'}</h1>
+          <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 13 }}>Lacak penjualan dari iklan WhatsApp kamu.</p>
         </div>
         {mode === 'register' ? (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 700 }}>
             Nama lengkap
-            <input autoComplete="name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama Anda" style={field} />
+            <input autoComplete="name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama kamu" style={field} />
           </label>
         ) : null}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 700 }}>

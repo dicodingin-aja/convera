@@ -105,8 +105,8 @@ WHERE sc.token_hash = $1 AND sc.used_at IS NULL AND sc.expires_at > now() FOR UP
 			[]any{adminID, adminName + " (dukungan)", wsID, mustJSON(map[string]any{"reason": reason}), c.ClientIP()}},
 		// Transparansi: pemilik akun diberi tahu bahwa tim dukungan masuk.
 		{`INSERT INTO notifications (user_id, workspace_id, type, title, body, link) VALUES ($1::uuid, $2::uuid, 'support_access',
-		  'Tim dukungan Convera mengakses akun Anda', $3, '/koneksi')`,
-			[]any{userID, wsID, "Tim Convera membuka dashboard " + oneLine(wsName) + " untuk membantu Anda. Keperluan: " + oneLine(reason) + "."}},
+		  'Tim dukungan Convera membuka akun kamu', $3, '/koneksi')`,
+			[]any{userID, wsID, "Tim Convera membuka dashboard " + oneLine(wsName) + " untuk membantu kamu. Keperluan: " + oneLine(reason) + "."}},
 	}
 	for _, st := range steps {
 		if _, err := tx.Exec(c, st.sql, st.args...); err != nil {

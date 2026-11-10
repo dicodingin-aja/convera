@@ -7,6 +7,47 @@ Legenda: ✅ sudah dan **terbukti dites** · 🟡 sudah dibuat tapi **belum terb
 
 ---
 
+## Catatan update: slot kampanye iklan (10 November 2026, Axl, belum di-commit)
+
+Rencana dan keputusan lengkap: https://claude.ai/artifact/Kq5FFKDrf76XyzN2mY4oRs (minta Axl membagikan aksesnya).
+
+- **Harga per kampanye:** Rp150.000 (harga paket) per kampanye iklan per 30 hari. Langganan sekarang dihitung **30 hari per bulan** (3 bulan = 90 hari, 12 bulan = 360 hari), bukan bulan kalender.
+- **Satu slot = satu kampanye Meta.** Tanpa koneksi Meta Ads, satu iklan = satu slot. Setelah sinkron, target iklan otomatis digabung ke kampanyenya.
+- **Slot terisi otomatis:** kampanye pertama yang mendatangkan event. Kalau slot penuh, event dari kampanye lain `skipped` / `ad_not_tracked` dan customer diajak menambah slot. Chat organik tidak memakai slot dan tetap diproses (tidak tampil di Performa Iklan).
+- **Kunci 30 hari:** kampanye yang dilepas tetap memakai slot sampai 30 hari sejak mulai dilacak. Dilacak lagi dalam masa itu tidak memakai slot baru.
+- **Trial:** 1 slot (`settings.trial_ad_slots`).
+- **Tambah slot di tengah periode:** bayar per 30 hari, berlaku sejak disetujui, terpisah dari periode langganan (`purchase = 'slots'`).
+- **Meta Ads dihidupkan lagi (opsional):**
+  - `ADS_ENABLED = true`
+  - bagian "Akun Meta Ads" di Koneksi (`MetaAdsSection` di `KoneksiBackend.jsx`)
+  - menu Performa Iklan kembali di sidebar
+  - panel "Slot kampanye" di atas tabel Performa (`src/AdSlotsPanel.jsx`)
+  - Bila belum tersambung, tab Iklan menampilkan peringatan + tombol ke Koneksi
+- **Migrasi 00017:** `ad_campaign_map`, `tracked_targets`, kolom `ad_slots` + `purchase` di `payment_proofs` dan `payments`.
+- **Admin:**
+  - jumlah slot dan "Tambah slot" tampil di Verifikasi dan detail Customer
+  - Aktifkan/perpanjang manual bisa mengubah jumlah slot dan memilih "Tambah slot (30 hari)"
+- **Uji:** `backend/internal/server/ad_slots_test.go`, termasuk approve lewat API admin sungguhan dan sinkron dengan server Meta palsu.
+- ⚠️ **Belum dicek ke akun iklan Meta sungguhan** (Fase 1 di rencana). **Tampilan belum diklik di browser.**
+
+## Catatan update: multi-workspace & wajib bayar (10 November 2026, Axl, belum di-commit)
+
+- **Trial hanya untuk workspace pertama** (sudah ada). Workspace berikutnya mulai `expired` dan wajib dibayar. Baru: selama akun masih punya workspace yang **belum pernah dibayar** dan tidak punya akses (workspace baru yang belum dibayar, atau trial yang habis tanpa bayar), `POST /workspaces` dijawab 409 `unpaid_workspace`. Bayar atau hapus workspace itu dulu. Bukti transfer yang masih pending belum dihitung bayar.
+- **Kunci di server, bukan hanya di UI.** Aturan akses ada di satu tempat: `billing.AccessSQL` / `core.WorkspaceAccess`. Boleh = trial berjalan, aktif (termasuk masa tenggang), atau `pending` selama trial/periode sebelumnya belum habis. Workspace tanpa akses:
+  - aksi fitur dijawab **402 `subscription_required`**: simpan/tes koneksi Meta, scan QR, Meta Ads, buat/ubah aturan, konversi manual, tandai purchase, status lead massal, retry/nilai event, buat API key
+  - API publik `/v1/*` juga 402
+  - lihat data, unggah bukti transfer, ubah/hapus workspace, dan hapus data tetap boleh
+  - pesan WhatsApp masuk (webhook WABA dan layanan QR) **diabaikan**: tidak ada lead, pesan, maupun event. Sesi QR tidak diputus, jadi setelah bayar tidak perlu scan ulang.
+  - worker menandai event antrean `skipped` dengan `error_code = subscription_inactive` dan tidak memanggil Meta
+- **Bug isolasi diperbaiki (migrasi 00016):** `webhook_inbox` dulu unik `(provider, message_id)` untuk seluruh sistem, jadi pesan yang sama di workspace kedua dibuang diam-diam. Sekarang unik per workspace.
+- Frontend: setelah membuat workspace yang belum dibayar, pilihan paket langsung terbuka. Workspace trial yang mengunggah bukti (status `pending`) tidak lagi terkunci selama trialnya masih jalan.
+- **Uji integrasi baru dengan Postgres sungguhan:** `backend/internal/server/workspace_billing_test.go`. Database uji: `TEST_DATABASE_URL`, atau `DATABASE_URL` di `backend/.env` + akhiran `_test`; dibuat dan dimigrasi otomatis. Tanpa URL, uji dilewati. Isinya:
+  - trial sekali, wajib bayar, dan batas workspace belum bayar
+  - pembuatan workspace bersamaan
+  - 402 per endpoint
+  - pesan masuk dan worker untuk workspace belum bayar
+  - isolasi data antar workspace dan antar akun (404)
+
 ## Catatan update v1.3 part 1 (10 November 2026)
 
 Commit `4d3e49c` (branch `Jordi`).

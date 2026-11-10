@@ -114,7 +114,7 @@ export default function Paket() {
           {plans.map((p) => (
             <div className="card" key={p.id} style={{ gap: 14 }}>
               <div className="row between nowrap"><h2 style={{ fontSize: 18 }}>{p.name}</h2><Pill tone={p.shown ? 'ink' : ''}>{p.shown ? 'Ditampilkan' : 'Disembunyikan'}</Pill></div>
-              <div><span style={{ fontSize: 30, fontWeight: 600, letterSpacing: '-.02em' }}>{rp(p.price_month)}</span><span className="muted"> / bulan</span></div>
+              <div><span style={{ fontSize: 30, fontWeight: 600, letterSpacing: '-.02em' }}>{rp(p.price_month)}</span><span className="muted"> / kampanye / 30 hari</span></div>
               {p.price_12m ? <span className="muted sm">12 bulan: {rp(p.price_12m)} (hemat {rp(p.price_month * 12 - p.price_12m)})</span> : null}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{(p.features || []).map((f) => <span key={f} className="row nowrap"><span style={{ color: 'var(--accent)' }}><Icon name="check" size={16} /></span>{f}</span>)}</div>
               <div className="row between" style={{ marginTop: 'auto', borderTop: '1px solid var(--bg)', paddingTop: 14 }}>

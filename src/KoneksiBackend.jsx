@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ensureWorkspace, getMetaConnection, saveMetaConnection, testMetaConnection, getQrStatus, disconnectQr } from './services/backend.js';
+import { ensureWorkspace, getMetaConnection, saveMetaConnection, testMetaConnection, getQrStatus, disconnectQr, getAdsConnection, saveAdsConnection, syncAdsConnection, deleteAdsConnection } from './services/backend.js';
 import { isToken } from './services/validators.js';
 
 // Halaman Koneksi untuk mode backend (VITE_BACKEND_ENABLED=true).
@@ -48,7 +48,7 @@ function QrSection({ slug, wa, onChanged }) {
   const [msg, setMsg] = useState('');
   const connected = wa.status === 'connected';
   const stop = async () => {
-    if (!window.confirm('Batalkan koneksi WhatsApp? Chat baru tidak akan tercatat sampai Anda scan QR lagi.')) return;
+    if (!window.confirm('Batalkan koneksi WhatsApp? Chat baru tidak akan tercatat sampai kamu scan QR lagi.')) return;
     setBusy(true); setMsg('');
     try { await disconnectQr(slug); await onChanged(); } catch (e) { setMsg(e.message); } finally { setBusy(false); }
   };
@@ -58,10 +58,10 @@ function QrSection({ slug, wa, onChanged }) {
         <h2 style={h2}>WhatsApp</h2>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: connected ? 'var(--connectedText)' : 'var(--disconnectedText)' }}>
           <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: connected ? 'var(--connectedText)' : 'var(--disconnectedText)' }} />
-          {connected ? 'connected' : 'disconnected'}{wa.phone_masked ? ` · ${String(wa.phone_masked).replace('****', '•••')}` : ''}
+          {connected ? 'terhubung' : 'belum terhubung'}{wa.phone_masked ? ` · ${String(wa.phone_masked).replace('****', '•••')}` : ''}
         </span>
       </div>
-      <span style={hintStyle}>Chat dari iklan di nomor ini tercatat otomatis. Biarkan WhatsApp Business di ponsel tetap aktif dan terhubung internet (buka minimal sekali tiap 14 hari agar sesi tidak dicabut).</span>
+      <span style={hintStyle}>Chat dari iklan di nomor ini otomatis tercatat. Buka WhatsApp di HP minimal sekali tiap 14 hari supaya tidak terputus.</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
         <button type="button" onClick={stop} disabled={busy} style={{ ...btn, background: 'transparent', color: 'var(--danger)', boxShadow: 'inset 0 0 0 1.5px var(--danger)' }}>{busy ? 'Membatalkan…' : 'Batalkan koneksi'}</button>
         {msg ? <span role="alert" style={{ fontSize: 13, color: 'var(--danger)', flex: '1 1 220px' }}>{msg}</span> : null}
@@ -78,11 +78,89 @@ function QrLostSection({ onReconnect }) {
         <h2 style={h2}>WhatsApp</h2>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--disconnectedText)' }}>
           <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--disconnectedText)' }} />
-          disconnected
+          terputus
         </span>
       </div>
-      <span style={hintStyle}>Koneksi WhatsApp ke Convera terputus (mis. perangkat tertaut dihapus dari ponsel). Chat baru tidak tercatat sampai Anda scan QR lagi.</span>
+      <span style={hintStyle}>Koneksi WhatsApp ke Convera terputus (mis. perangkat tertaut dihapus dari ponsel). Chat baru tidak tercatat sampai kamu scan QR lagi.</span>
       <div><button type="button" onClick={onReconnect} style={{ ...btn, background: 'var(--accent)', color: '#fff' }}>Hubungkan ulang (scan QR)</button></div>
+    </section>
+  );
+}
+
+// Akun Meta Ads (opsional): biaya, klik, dan kampanye per iklan untuk halaman Performa Iklan dan slot kampanye.
+// Hanya izin baca (ads_read). Tanpa koneksi ini setiap iklan dihitung satu slot kampanye.
+function MetaAdsSection({ slug }) {
+  const [ads, setAds] = useState(null);
+  const [f, setF] = useState({ account: '', token: '' });
+  const [busy, setBusy] = useState('');
+  const [msg, setMsg] = useState(null); // { ok, text }
+  const [confirmOff, setConfirmOff] = useState(false);
+  const load = async () => { try { setAds(await getAdsConnection(slug)); } catch (e) { setMsg({ ok: false, text: e.message }); } };
+  useEffect(() => { if (slug) load(); }, [slug]);
+
+  const run = (key, fn, okText) => async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setBusy(key); setMsg(null);
+    try {
+      const out = await fn();
+      if (out && typeof out === 'object' && 'connected' in out) setAds(out); else await load();
+      if (okText) setMsg({ ok: true, text: okText });
+    } catch (err) { setMsg({ ok: false, text: err.message }); } finally { setBusy(''); setConfirmOff(false); }
+  };
+  const save = run('save', async () => {
+    const out = await saveAdsConnection(slug, { ad_account_id: f.account.trim(), access_token: f.token.trim() });
+    setF({ account: '', token: '' });
+    return out;
+  }, 'Tersambung. Data iklan sedang disinkronkan, biasanya selesai dalam 1–2 menit.');
+
+  if (!ads) return <section style={card}><h2 style={h2}>Akun Meta Ads</h2><span style={hintStyle}>Memuat…</span></section>;
+  const on = ads.connected;
+  const stText = !on ? 'belum terhubung' : ads.status === 'connected' ? 'connected' : ads.status === 'invalid' ? 'token tidak valid' : ads.status === 'pending' ? 'menyinkronkan' : 'error';
+  const stColor = on && ads.status === 'connected' ? 'var(--connectedText)' : 'var(--disconnectedText)';
+  const when = (d) => (d ? new Date(d).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'belum pernah');
+  const canSave = !busy && f.account.trim() && f.token.trim();
+
+  return (
+    <section style={card}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <h2 style={h2}>Akun Meta Ads <span style={{ ...hintStyle, fontSize: 12 }}>· opsional</span></h2>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: stColor }}>
+          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: stColor }} />{stText}
+        </span>
+      </div>
+      <span style={hintStyle}>Untuk melihat spend dan ROAS di Performa Iklan, dan supaya slot dihitung per kampanye. Convera hanya membaca data, tidak mengubah iklan kamu.</span>
+      {on ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, fontSize: 14 }}>
+          <span><span style={hintStyle}>Ad Account</span><br /><b style={mono}>act_{ads.ad_account_id}</b>{ads.account_name ? ' · ' + ads.account_name : ''}</span>
+          <span><span style={hintStyle}>Sinkron terakhir</span><br />{when(ads.last_sync_at)} · tiap 30 menit</span>
+          <span><span style={hintStyle}>Mata uang · token</span><br />{ads.currency || '—'} · <span style={mono}>{ads.access_token_hint || '—'}</span></span>
+        </div>
+      ) : null}
+      {on && ads.last_error ? <span role="alert" style={{ fontSize: 13, color: 'var(--danger)' }}>{ads.last_error}</span> : null}
+      {on && ads.currency && ads.currency !== 'IDR' ? <span style={hintStyle}>Mata uang akun iklan {ads.currency}: ROAS di Convera hanya akurat untuk akun dalam Rupiah.</span> : null}
+      {!ads.graph_configured ? <span style={{ ...hintStyle, color: 'var(--danger)' }}>Server belum dikonfigurasi untuk Meta (GRAPH_API_VERSION kosong). Hubungi admin Convera.</span> : null}
+
+      <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <label style={label}>{on ? 'Ganti Ad Account ID' : 'Ad Account ID'}
+          <input value={f.account} onChange={(e) => setF((x) => ({ ...x, account: e.target.value }))} inputMode="numeric" placeholder="act_1234567890" style={{ ...field, ...mono }} />
+        </label>
+        <label style={label}>Access token (izin ads_read)
+          <Secret value={f.token} onChange={(e) => setF((x) => ({ ...x, token: e.target.value }))} placeholder={on ? 'Tersimpan (' + (ads.access_token_hint || '') + '). Isi untuk mengganti.' : 'EAAB…'} />
+          <span style={hintStyle}>Pakai token System User supaya tidak kedaluwarsa. Akun iklan ini harus sudah diberikan ke System User itu.</span>
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+          <button type="submit" disabled={!canSave} style={{ ...btn, background: 'var(--accent)', color: '#fff', opacity: canSave ? 1 : 0.5 }}>{busy === 'save' ? 'Menghubungkan…' : on ? 'Simpan akun baru' : 'Hubungkan'}</button>
+          {on ? <button type="button" disabled={!!busy} onClick={run('sync', () => syncAdsConnection(slug), 'Sinkronisasi dimulai. Buka lagi halaman Performa Iklan dalam 1–2 menit.')} style={{ ...btn, background: 'var(--surface)', color: 'var(--text)' }}>{busy === 'sync' ? 'Memulai…' : 'Sinkronkan sekarang'}</button> : null}
+          {on && !confirmOff ? <button type="button" disabled={!!busy} onClick={() => setConfirmOff(true)} style={{ ...btn, background: 'transparent', color: 'var(--danger)', boxShadow: 'inset 0 0 0 1.5px var(--danger)' }}>Putuskan</button> : null}
+          {on && confirmOff ? (
+            <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 13 }}>Data biaya iklan dihapus dari Convera. Lanjut?
+              <button type="button" disabled={!!busy} onClick={run('off', () => deleteAdsConnection(slug), 'Akun Meta Ads diputus.')} style={{ ...btn, height: 36, background: 'var(--danger)', color: '#fff' }}>{busy === 'off' ? 'Memutus…' : 'Ya, putuskan'}</button>
+              <button type="button" onClick={() => setConfirmOff(false)} style={{ ...btn, height: 36, background: 'var(--surface)', color: 'var(--text)' }}>Batal</button>
+            </span>
+          ) : null}
+        </div>
+        {msg ? <span role="status" style={{ fontSize: 13, color: msg.ok ? 'var(--muted)' : 'var(--danger)' }}>{msg.text}</span> : null}
+      </form>
     </section>
   );
 }
@@ -177,7 +255,7 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
           <h2 style={h2}>Meta CAPI</h2>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: stColor }}>
             <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: stColor }} />
-            {realtimeStatus}
+            {realtimeStatus === 'connected' ? 'terhubung' : 'belum terhubung'}
           </span>
         </div>
         <div style={label}>Jenis koneksi WhatsApp
@@ -202,7 +280,7 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
       {isWaba ? (
         <section style={card}>
           <h2 style={h2}>WABA API / CRM (webhook)</h2>
-          <span style={hintStyle}>Salin URL di bawah, lalu tempel sebagai tujuan webhook di penyedia WABA / CRM Anda (mis. kirim.chat). Setiap chat dari iklan yang masuk ke sana akan diteruskan ke Convera. Anda tidak perlu mengisi apa pun lagi di sini.</span>
+          <span style={hintStyle}>Salin URL di bawah, lalu tempel sebagai tujuan webhook di penyedia WABA atau CRM kamu (mis. kirim.chat). Chat dari iklan yang masuk ke sana akan diteruskan ke Convera. Selesai, tidak ada yang perlu diisi lagi.</span>
           <CopyRow title="Webhook URL" text={conn.webhook_url} />
           <details>
             <summary style={{ ...hintStyle, cursor: 'pointer' }}>Pengaturan lanjutan (opsional)</summary>
@@ -238,6 +316,7 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
         {msg ? <span role="status" style={{ fontSize: 13, color: msg.ok ? 'var(--muted)' : 'var(--danger)', flex: '1 1 240px' }}>{msg.text}</span> : null}
       </div>
     </form>
+    {slug ? <MetaAdsSection slug={slug} /> : null}
     </div>
   );
 }
