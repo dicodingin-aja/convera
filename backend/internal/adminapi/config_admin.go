@@ -180,6 +180,28 @@ func (s *Server) putMaintenance(c *gin.Context) {
 	}
 	s.withAudit(c, "maintenance.update", "settings", func(tx pgx.Tx) (string, map[string]any, error) {
 		if in.Enabled != nil {
+			// Beritahu semua customer (lonceng) hanya saat status benar-benar berubah.
+			var was bool
+			_ = tx.QueryRow(c, `SELECT COALESCE((SELECT (value #>> '{}')::boolean FROM settings WHERE key = 'maintenance'), false)`).Scan(&was)
+			if was != *in.Enabled {
+				title, body := "Maintenance selesai", "Convera sudah kembali normal. Anda bisa membuat workspace dan event baru lagi."
+				if *in.Enabled {
+					title, body = "Convera sedang maintenance", "Selama maintenance Anda hanya bisa memantau data; membuat workspace atau event baru dinonaktifkan sementara."
+					var m string
+					if in.Message != nil {
+						m = strings.TrimSpace(*in.Message)
+					} else {
+						_ = tx.QueryRow(c, `SELECT COALESCE((SELECT value #>> '{}' FROM settings WHERE key = 'maintenance_message'), '')`).Scan(&m)
+					}
+					if m != "" {
+						body = m + " " + body
+					}
+				}
+				if _, err := tx.Exec(c, `INSERT INTO notifications (user_id, type, title, body)
+					SELECT id, 'maintenance', $1, $2 FROM users WHERE deleted_at IS NULL`, title, body); err != nil {
+					return "", nil, err
+				}
+			}
 			raw, _ := json.Marshal(*in.Enabled)
 			if _, err := tx.Exec(c, `INSERT INTO settings (key, value, updated_by) VALUES ('maintenance', $1, $2::uuid)
 				ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by`, raw, adminID(c)); err != nil {

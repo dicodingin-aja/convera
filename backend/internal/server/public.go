@@ -1,6 +1,10 @@
 package server
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
 
 // publicPlans: daftar paket yang tampil di modal Upgrade (dikelola dari Convera Admin).
 func (s *Server) publicPlans(c *gin.Context) {
@@ -29,4 +33,21 @@ func (s *Server) publicStatus(c *gin.Context) {
 	}
 	rows[0]["flags"] = flags
 	ok(c, rows[0])
+}
+
+// maintenanceGuard menolak aksi pembuatan (workspace baru, event/konversi manual, aturan baru) saat mode maintenance
+// aktif. Customer tetap bisa memantau data (GET) dan data yang masuk otomatis tetap tercatat.
+func (s *Server) maintenanceGuard() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var on bool
+		if err := s.DB.QueryRow(c, `SELECT COALESCE((SELECT (value #>> '{}')::boolean FROM settings WHERE key = 'maintenance'), false)`).Scan(&on); err != nil {
+			serverError(c, err)
+			return
+		}
+		if on {
+			fail(c, http.StatusServiceUnavailable, "maintenance", "Maintenance Ongoing")
+			return
+		}
+		c.Next()
+	}
 }

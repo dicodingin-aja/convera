@@ -156,6 +156,43 @@ func (s *Server) bulkLeadStatus(c *gin.Context) {
 	ok(c, gin.H{"updated": tag.RowsAffected()})
 }
 
+// ---------- Hapus satu lead ----------
+
+// deleteLead: DELETE /leads/:id. Menghapus permanen satu lead beserta event dan pesannya di workspace ini.
+// Dicatat di audit log dengan nomor tersamarkan.
+func (s *Server) deleteLead(c *gin.Context) {
+	tx, err := s.DB.Begin(c)
+	if err != nil {
+		serverError(c, err)
+		return
+	}
+	defer tx.Rollback(c)
+	var phone string
+	err = tx.QueryRow(c, `SELECT phone FROM leads WHERE id::text = $1 AND workspace_id = $2 AND deleted_at IS NULL FOR UPDATE`, c.Param("id"), wsID(c)).Scan(&phone)
+	if err != nil {
+		fail(c, http.StatusNotFound, "lead_not_found", "Lead tidak ditemukan.")
+		return
+	}
+	ev, err := tx.Exec(c, `DELETE FROM events WHERE workspace_id = $1 AND lead_id::text = $2`, wsID(c), c.Param("id"))
+	if err != nil {
+		serverError(c, err)
+		return
+	}
+	if _, err := tx.Exec(c, `DELETE FROM leads WHERE workspace_id = $1 AND id::text = $2`, wsID(c), c.Param("id")); err != nil {
+		serverError(c, err)
+		return
+	}
+	if err := auditUser(c, tx, c.GetString("user_id"), wsID(c), "lead.delete", wa.MaskPhone(phone)); err != nil {
+		serverError(c, err)
+		return
+	}
+	if err := tx.Commit(c); err != nil {
+		serverError(c, err)
+		return
+	}
+	ok(c, gin.H{"deleted": true, "events": ev.RowsAffected()})
+}
+
 // ---------- Hapus data kontak (UU PDP) ----------
 
 // eraseContact: POST /leads/erase {phone}. Menghapus permanen semua lead dengan nomor itu di workspace ini beserta

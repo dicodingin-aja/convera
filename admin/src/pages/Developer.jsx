@@ -72,7 +72,7 @@ function Maintenance({ isSuper }) {
   const save = (body) => run(async () => { await api.put('/maintenance', body); q.reload(); });
   return (
     <div className="card">
-      <div className="row between nowrap"><div><h2>Mode maintenance</h2><span className="muted sm">{on ? 'Aktif. Customer melihat pesan di bawah.' : 'Nonaktif. Customer bisa memakai dashboard normal.'}</span></div>
+      <div className="row between nowrap"><div><h2>Mode maintenance</h2><span className="muted sm">{on ? 'Aktif. Customer hanya bisa memantau (tidak bisa buat workspace/event baru) dan melihat pesan di bawah.' : 'Nonaktif. Menyalakan akan mengirim notifikasi ke semua customer.'}</span></div>
         <Toggle on={on} label="Mode maintenance" onChange={(v) => { if (isSuper) save({ enabled: v }); }} /></div>
       <input className="input" value={msg} maxLength={300} onChange={(e) => setMsg(e.target.value)} />
       <div className="row"><button className="btn s" disabled={busy || !isSuper || !msg.trim() || msg === q.data.data.message} onClick={() => save({ message: msg })}>Simpan pesan</button>{!isSuper ? <span className="muted sm">Hanya superadmin yang bisa mengubah.</span> : null}</div>

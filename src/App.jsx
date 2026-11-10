@@ -101,6 +101,11 @@ export default class App extends React.Component {
   handleUnauthorized = () => {
     if (!this.state.session) return;
     const support = this.state.session.support;
+    const maint = this.state.maint?.on ? (
+      <div role="status" style={{ ...vals.rootStyle, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 16px', background: '#b4440f', color: '#fff', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
+        <span>Maintenance Ongoing{this.state.maint.message ? ' · ' + this.state.maint.message : ''}</span>
+      </div>
+    ) : null;
     clearLocalSession();
     try { sessionStorage.setItem('convera:notice', support ? 'Sesi dukungan berakhir.' : 'Sesi berakhir. Silakan masuk lagi.'); } catch { /* abaikan */ }
     this.setState({ session: null, route: null, plansFor: null, workspaces: null, realSub: null, live: null });
@@ -182,6 +187,11 @@ export default class App extends React.Component {
     if (!appConfig.backendEnabled || !this.state.session) return;
     try { this.setState({ notifs: await notifApi.list() }); } catch { /* biarkan daftar sebelumnya */ }
   };
+  // Mode maintenance: dibaca dari /status; saat aktif customer hanya bisa memantau (tidak bisa buat workspace/event baru).
+  refreshMaint = async () => {
+    if (!appConfig.backendEnabled || !this.state.session) return;
+    try { const st = await liveApi.status(); const cur = this.state.maint; if (!cur || cur.on !== !!st.maintenance || cur.message !== st.message) this.setState({ maint: { on: !!st.maintenance, message: st.message || '' } }); } catch { /* biarkan status sebelumnya */ }
+  };
   readAllNotifs = async () => {
     const cur = this.state.notifs;
     if (cur) this.setState({ notifs: { items: cur.items.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })), unread: 0 } });
@@ -226,6 +236,7 @@ export default class App extends React.Component {
       return { ok: true, message: r.leads ? r.leads + ' lead dan ' + r.events + ' event dihapus permanen' : 'Tidak ada data dengan nomor ini' };
     } catch (e) { return { ok: false, message: e.message || 'Terjadi kesalahan' }; }
   };
+  liveDeleteLead = (id) => this.liveAction(() => liveApi.deleteLead(this._activeWsSlug, id));
   liveDeleteRule = (id) => this.liveAction(() => liveApi.deleteRule(this._activeWsSlug, id));
 
   // Auto-logout bila tidak ada aktivitas pengguna selama 30 menit. Hanya sesi login di browser ini yang berakhir;
@@ -261,7 +272,7 @@ export default class App extends React.Component {
     this.checkIdle(); // tab dibuka lagi setelah >30 menit tanpa aktivitas: langsung keluar
     this._lastTouch = 0; this.touchActivity();
     this.loadWorkspaces();
-    this._liveTimer = setInterval(() => { if (document.visibilityState === 'visible') { this.refreshLive(); this.refreshNotifs(); } }, 30000);
+    this._liveTimer = setInterval(() => { if (document.visibilityState === 'visible') { this.refreshLive(); this.refreshNotifs(); this.refreshMaint(); } }, 30000);
   }
   componentDidUpdate() {
     if (appConfig.backendEnabled && this.state.session && this.state.workspaces && this._activeWsSlug) {
@@ -273,7 +284,7 @@ export default class App extends React.Component {
       const key = this.state.session.username + '|' + this._activeWsSlug;
       if (this._securityKey !== key) { this._securityKey = key; this.loadSecurity(); }
     }
-    if (appConfig.backendEnabled && this.state.session && this._notifSession !== this.state.session) { this._notifSession = this.state.session; this.refreshNotifs(); }
+    if (appConfig.backendEnabled && this.state.session && this._notifSession !== this.state.session) { this._notifSession = this.state.session; this.refreshNotifs(); this.refreshMaint(); }
     const ws = this._activeWsName;
     if (appConfig.backendEnabled && this.state.session && ws && (this._subWs !== ws || this._subSession !== this.state.session)) {
       this._subWs = ws; this._subSession = this.state.session;
@@ -283,7 +294,7 @@ export default class App extends React.Component {
   componentWillUnmount() { this.logic.componentWillUnmount(); window.removeEventListener('convera:unauthorized', this.handleUnauthorized); clearInterval(this._liveTimer); clearInterval(this._idleTimer); (this._idleEvents || []).forEach((e) => window.removeEventListener(e, this.touchActivity, true)); document.removeEventListener('visibilitychange', this.checkIdle); }
   render() {
     this.logic.props = appConfig.backendEnabled && this.state.workspaces
-      ? { ...this.props_, backendEnabled: true, workspaces: this.state.workspaces, activeWorkspace: this.state.workspaces[this.logic.state.ws], security: this.state.security, live: this.state.live || emptyLive(this.logic.state.range ?? 2), notifs: this.state.notifs || { items: [], unread: 0 }, readAllNotifs: this.readAllNotifs, saveWorkspaceSettings: this.saveWorkspaceSettings, changeSecurityPassword: this.saveSecurityPassword, revokeSecuritySession: this.revokeSecuritySession, profileName: this.logic.state.profile?.name || this.state.session.name || '', profileEmail: this.logic.state.profile?.email || this.state.session.email || '', profilePhone: this.logic.state.profile?.phone || this.state.session.phone || '', realSub: this.state.realSub }
+      ? { ...this.props_, backendEnabled: true, workspaces: this.state.workspaces, activeWorkspace: this.state.workspaces[this.logic.state.ws], security: this.state.security, live: this.state.live || emptyLive(this.logic.state.range ?? 2), notifs: this.state.notifs || { items: [], unread: 0 }, maint: !!this.state.maint?.on, readAllNotifs: this.readAllNotifs, saveWorkspaceSettings: this.saveWorkspaceSettings, changeSecurityPassword: this.saveSecurityPassword, revokeSecuritySession: this.revokeSecuritySession, profileName: this.logic.state.profile?.name || this.state.session.name || '', profileEmail: this.logic.state.profile?.email || this.state.session.email || '', profilePhone: this.logic.state.profile?.phone || this.state.session.phone || '', realSub: this.state.realSub }
       : { ...this.props_, backendEnabled: false, profileName: this.logic.state.profile?.name || this.state.session?.name || '', profileEmail: this.logic.state.profile?.email || this.state.session?.email || '', profilePhone: this.logic.state.profile?.phone || this.state.session?.phone || '', realSub: null };
     const vals = { ...this.props_, ...(this.logic.renderVals() || {}) };
     if (!this.state.session) return <LoginPage themeStyle={vals.rootStyle} onLogin={this.handleLogin} />;
@@ -334,7 +345,7 @@ export default class App extends React.Component {
     }
     if (appConfig.backendEnabled) {
       // "Tambah workspace" (pilihan workspace / tombol kosong) membuka kartu isian nama di atas Dashboard, seperti PixelAD.
-      vals.newWs = () => { this.__setLogicState({ menu: null, page: 'overview' }); this.setState({ route: null, createWsOpen: true }); };
+      vals.newWs = () => { if (this.state.maint?.on) return; this.__setLogicState({ menu: null, page: 'overview' }); this.setState({ route: null, createWsOpen: true }); };
       if (this._noWs) {
         // Akun baru tanpa workspace: langsung di Dashboard, isi nama untuk membuat workspace pertama (bukan layar penuh).
         vals.pg = Object.fromEntries(Object.keys(vals.pg || {}).map((k) => [k, false]));
@@ -379,6 +390,7 @@ export default class App extends React.Component {
     return (
       <div className="sc-host" onClickCapture={this.handleShellClick} style={support ? { paddingTop: 44 } : undefined}>
         {banner}
+        {maint}
         <Template v={vals} />
         {modal}
       </div>

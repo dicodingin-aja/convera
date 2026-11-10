@@ -60,6 +60,7 @@ class Component extends DCLogic {
     const R = (x, y, w, h, rx = 1) => ['rect', { x, y, width: w, height: h, rx }];
     const Ci = (cx, cy, r) => ['circle', { cx, cy, r }];
     return {
+      trash: mk(['M3 6h18', 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2', 'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6', 'M10 11v6', 'M14 11v6'], 16),
       dash: mk([R(3, 3, 7, 9), R(14, 3, 7, 5), R(14, 12, 7, 9), R(3, 16, 7, 5)]),
       users: mk(['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', Ci(9, 7, 4), 'M22 21v-2a4 4 0 0 0-3-3.87', 'M16 3.13a4 4 0 0 1 0 7.75']),
       bag: mk(['M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z', 'M3 6h18', 'M16 10a4 4 0 0 1-8 0']),
@@ -194,9 +195,10 @@ class Component extends DCLogic {
     const sel = s.ldSel || {}; const nSel = lrows.filter((l) => sel[l.id]).length;
     const box = (on) => ({ fontFamily: 'inherit', width: 20, height: 20, borderRadius: 6, border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: on ? 'var(--accent)' : 'var(--surface)', color: '#fff', boxShadow: on ? 'none' : 'inset 0 0 0 1.5px var(--borderStrong)' });
     const cdOf = (l) => l.organic ? ['Organik', pill('neutral')] : l.hl <= 0 ? ['Kedaluwarsa', pill('neutral', { textDecoration: 'line-through' })] : l.hl < 24 ? [l.hl + ' jam lagi', pill('err')] : [Math.floor(l.hl / 24) + ' hari lagi', pill('plain')];
-    const openMk = (l) => set({ mk: { id: l.id, ev: s.defEv || 'Purchase', amount: l.value ? String(l.value) : '', note: '' }, ldOpen: null });
+    const MT = !!P.maint;
+    const openMk = (l) => MT ? say('Maintenance Ongoing') : set({ mk: { id: l.id, ev: s.defEv || 'Purchase', amount: l.value ? String(l.value) : '', note: '' }, ldOpen: null });
     const actOf = (l) => l.status === 'Purchase' ? ['Terkirim ✓', bN, () => set({ ldOpen: l.id })] : l.organic ? ['Tanpa ctwa_clid', bN, () => set({ ldOpen: l.id })] : l.hl <= 0 ? ['Lewat 7 hari', bN, () => openMk(l)] : ['Tandai Purchase', bS, () => openMk(l)];
-    const LG = '36px minmax(180px,1.1fr) minmax(230px,1.4fr) minmax(200px,1.3fr) 110px 130px 110px 150px';
+    const LG = '36px minmax(180px,1.1fr) minmax(230px,1.4fr) minmax(200px,1.3fr) 110px 130px 110px 150px 36px';
     const csv = (name, head, rows) => downloadCsv(name, head, rows);
     const ld = {
       q: s.ldQ || '', setQ: (e) => set({ ldQ: e.target.value }), camp: lcamp, setCamp: (e) => set({ ldCamp: e.target.value }),
@@ -207,7 +209,7 @@ class Component extends DCLogic {
       allBox: box(lrows.length > 0 && nSel === lrows.length), allTick: lrows.length > 0 && nSel === lrows.length ? ic.check : null,
       toggleAll: () => { const all = nSel === lrows.length; const o = {}; if (!all) lrows.forEach((l) => (o[l.id] = true)); set({ ldSel: o }); },
       desktop: !mobile && lrows.length > 0, mobile: mobile && lrows.length > 0, empty: lrows.length === 0,
-      rows: lrows.map((l) => { const [cd, cdS] = cdOf(l); const [actLabel, aS, act] = actOf(l); return { name: l.name, phone: l.phone, ini: ini(l.name), adName: l.A ? l.A.name : 'Chat organik', adPath: l.A ? l.A.camp + ' › ' + l.A.set : 'Tidak dari iklan', adIni: l.A ? ini(l.A.name) : '—', thumb: thumb(l.ad < 0 ? 3 : l.ad), msg: '“' + l.msg + '”', time: tfmt(l.clickAt), status: l.status, pill: pill(LSP[l.status]), pd: { width: 6, height: 6, borderRadius: '50%', flex: 'none', background: l.status === 'Baru' ? 'var(--accent)' : 'currentColor' }, cd, cs: { ...cdS, gap: 5 }, value: l.value ? rp(l.value) : '—', actLabel, act, as: { ...aS, height: 34, width: '100%' }, asLg: { ...aS, height: 48, width: '100%', fontSize: 15 }, open: () => set({ ldOpen: l.id }), tick: sel[l.id] ? ic.check : null, box: box(!!sel[l.id]), toggleSel: () => set({ ldSel: { ...sel, [l.id]: !sel[l.id] } }), rowStyle: { display: 'grid', gridTemplateColumns: LG, gap: 14, padding: '10px 18px', alignItems: 'center', borderTop: '1px solid var(--bg)', background: sel[l.id] ? 'var(--accentSoft)' : 'transparent' } }; }),
+      rows: lrows.map((l) => { const [cd, cdS] = cdOf(l); const [actLabel, aS, act] = actOf(l); return { name: l.name, phone: l.phone, ini: ini(l.name), adName: l.A ? l.A.name : 'Chat organik', adPath: l.A ? l.A.camp + ' › ' + l.A.set : 'Tidak dari iklan', adIni: l.A ? ini(l.A.name) : '—', thumb: thumb(l.ad < 0 ? 3 : l.ad), msg: '“' + l.msg + '”', time: tfmt(l.clickAt), status: l.status, pill: pill(LSP[l.status]), pd: { width: 6, height: 6, borderRadius: '50%', flex: 'none', background: l.status === 'Baru' ? 'var(--accent)' : 'currentColor' }, cd, cs: { ...cdS, gap: 5 }, value: l.value ? rp(l.value) : '—', actLabel, act, as: { ...aS, height: 34, width: '100%' }, asLg: { ...aS, height: 48, width: '100%', fontSize: 15 }, open: () => set({ ldOpen: l.id }), tick: sel[l.id] ? ic.check : null, box: box(!!sel[l.id]), toggleSel: () => set({ ldSel: { ...sel, [l.id]: !sel[l.id] } }), del: () => set({ delLead: { id: l.id, name: l.name, phone: l.phone } }), delIc: ic.trash, rowStyle: { display: 'grid', gridTemplateColumns: LG, gap: 14, padding: '10px 18px', alignItems: 'center', borderTop: '1px solid var(--bg)', background: sel[l.id] ? 'var(--accentSoft)' : 'transparent' } }; }),
     };
     const ml = s.mk ? LEADS.find((l) => l.id === s.mk.id) : null;
     let mk = { open: false };
@@ -436,7 +438,10 @@ class Component extends DCLogic {
           actions: adOn ? [A('Ganti akun', () => say('Pilih Ad Account', 'Membuka Meta Business…')), A('Putuskan', () => cfOpen('ad'), 'd')] : [A('Hubungkan Ad Account', () => { set({ disc: { ...disc, ad: false }, ws: s.ws === 1 ? 0 : s.ws }); say('Ad Account terhubung'); }, 'p')] },
       ] };
     const CF = { meta: ['Putuskan Meta Dataset?', 'Event baru tidak akan dikirim ke Meta dan optimasi iklan kehilangan sinyal konversi. Data yang sudah terkirim tetap aman.'], wa: ['Putuskan nomor WhatsApp?', 'Chat baru dari iklan tidak lagi tercatat sebagai Lead. Riwayat lead tetap tersimpan.'], ad: ['Putuskan Ad Account?', 'Spend, Cost per Purchase, dan ROAS tidak lagi diperbarui.'] };
-    const cf = s.confirm ? { open: true, title: CF[s.confirm][0], body: CF[s.confirm][1], cta: 'Ya, putuskan', close: () => set({ confirm: null }), ok: () => { const k = s.confirm; set({ confirm: null, disc: { ...disc, [k]: true } }); say(CF[k][0].replace('Putuskan ', '').replace('?', '') + ' diputuskan'); } } : { open: false };
+    const cf = s.delLead ? { open: true, title: 'Hapus lead ini?', body: s.delLead.name + ' (' + s.delLead.phone + ') beserta seluruh event dan riwayat chatnya akan dihapus permanen dan tidak bisa dikembalikan.', cta: 'Ya, hapus', close: () => set({ delLead: null }),
+      ok: () => { const d = s.delLead; set({ delLead: null, ldOpen: s.ldOpen === d.id ? null : s.ldOpen, ldSel: { ...(s.ldSel || {}), [d.id]: false } });
+        if (LV) { this.__host.liveDeleteLead(d.id).then((r) => say(r.ok ? 'Lead dihapus' : 'Gagal menghapus lead', r.ok ? d.name : r.message)); return; }
+        set({ delPhones: [...(s.delPhones || []), normPhone(d.phone)] }); say('Lead dihapus', d.name); } } : s.confirm ? { open: true, title: CF[s.confirm][0], body: CF[s.confirm][1], cta: 'Ya, putuskan', close: () => set({ confirm: null }), ok: () => { const k = s.confirm; set({ confirm: null, disc: { ...disc, [k]: true } }); say(CF[k][0].replace('Putuskan ', '').replace('?', '') + ' diputuskan'); } } : { open: false };
     const tk = s.tokModal ? { open: true, val: s.tokVal || '', set: (e) => set({ tokVal: e.target.value }), close: () => set({ tokModal: false }), save: async () => { const t = (s.tokVal || '').trim(); if (t.length < 20) { say('Token terlalu pendek', 'Salin ulang dari Events Manager'); return; } say('Menguji token…'); const r = await testConnection({ datasetId: s.f.dataset, token: t }); if (!r.ok) { say('Token ditolak', r.error); return; } set({ tokModal: false, tokenDays: 60, f: { ...s.f, token: t }, banners: { ...s.banners, token: false } }); say('Token diperbarui', 'Berlaku 60 hari · koneksi OK'); } } : { open: false };
 
     // ---------- integrasi ----------

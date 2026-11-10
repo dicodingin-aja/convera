@@ -312,6 +312,8 @@ export const liveApi = {
       : requestJson('/api/v1/event-rules', { method: 'POST', workspace: slug, body });
   },
   erase: (slug, phone) => requestJson('/api/v1/leads/erase', { method: 'POST', workspace: slug, body: JSON.stringify({ phone }) }).then((r) => r.data),
+  deleteLead: (slug, id) => requestJson('/api/v1/leads/' + id, { method: 'DELETE', workspace: slug }),
+  status: () => requestJson('/api/v1/status').then((r) => r.data),
   deleteRule: (slug, id) => requestJson('/api/v1/event-rules/' + id, { method: 'DELETE', workspace: slug }),
 };
 
