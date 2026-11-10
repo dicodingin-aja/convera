@@ -56,8 +56,8 @@ function QrSection({ slug, wa, onChanged }) {
     <section style={card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <h2 style={h2}>WhatsApp</h2>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: connected ? 'var(--okFg)' : 'var(--errFg)' }}>
-          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: connected ? 'var(--okFg)' : 'var(--errFg)' }} />
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: connected ? 'var(--connectedText)' : 'var(--disconnectedText)' }}>
+          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: connected ? 'var(--connectedText)' : 'var(--disconnectedText)' }} />
           {connected ? 'connected' : 'disconnected'}{wa.phone_masked ? ` · ${String(wa.phone_masked).replace('****', '•••')}` : ''}
         </span>
       </div>
@@ -76,8 +76,8 @@ function QrLostSection({ onReconnect }) {
     <section style={{ ...card, boxShadow: 'inset 0 0 0 1.5px var(--danger)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <h2 style={h2}>WhatsApp</h2>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--errFg)' }}>
-          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--errFg)' }} />
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--disconnectedText)' }}>
+          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--disconnectedText)' }} />
           disconnected
         </span>
       </div>
@@ -166,8 +166,8 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
 
   if (loadError) return <div role="alert" style={{ ...card, maxWidth: 760, color: 'var(--danger)', fontSize: 14 }}>{loadError}</div>;
   if (!conn) return <div style={{ ...card, maxWidth: 760, color: 'var(--muted)', fontSize: 14 }}>Memuat koneksi…</div>;
-  const metaConnected = conn.status === 'connected';
-  const [stText, stColor] = metaConnected ? ['connected', 'var(--okFg)'] : ['disconnected', 'var(--errFg)'];
+  const realtimeStatus = f.mode === 'qr' ? (wa && wa.status === 'connected' ? 'connected' : 'disconnected') : (conn.status === 'connected' ? 'connected' : 'disconnected');
+  const stColor = realtimeStatus === 'connected' ? 'var(--connectedText)' : 'var(--disconnectedText)';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 760 }}>
@@ -177,7 +177,7 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
           <h2 style={h2}>Meta CAPI</h2>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: stColor }}>
             <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: stColor }} />
-            {stText}
+            {realtimeStatus}
           </span>
         </div>
         <div style={label}>Jenis koneksi WhatsApp

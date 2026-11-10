@@ -41,8 +41,8 @@ class Component extends DCLogic {
       ? (dark ? { a: '#8b93ff', as: '#a5abff', at: '#a5abff', aS: '#24244a' } : { a: '#4f46e5', as: '#4338ca', at: '#4338ca', aS: '#eef0ff' })
       : (dark ? { a: '#ef8240', as: '#f59d66', at: '#d8d3c9', aS: '#2b2926' } : { a: '#e8732c', as: '#c95f1f', at: '#4a4640', aS: '#f3f1ee' });
     const B = dark
-      ? { bg: '#151413', surface: '#151413', surface2: '#1f1e1c', input: '#1f1e1c', border: '#302e2a', borderStrong: '#47433d', text: '#f3f0ea', muted: '#a39e95', ink: '#f3f0ea', inkText: '#1b1a18', neutral: '#2b2926', danger: '#f59d66', shadow: 'none' }
-      : { bg: '#ffffff', surface: '#ffffff', surface2: '#f6f5f3', input: '#f6f5f3', border: '#e7e2db', borderStrong: '#d3ccc2', text: '#1d1c1a', muted: '#6b675f', ink: '#2f2e2c', inkText: '#ffffff', neutral: '#ece8e2', danger: '#b8530f', shadow: 'none' };
+      ? { bg: '#151413', surface: '#151413', surface2: '#1f1e1c', input: '#1f1e1c', border: '#302e2a', borderStrong: '#47433d', text: '#f3f0ea', muted: '#a39e95', ink: '#f3f0ea', inkText: '#1b1a18', neutral: '#2b2926', danger: '#f59d66', connectedText: '#78d6a0', disconnectedText: '#ff9b9b', shadow: 'none' }
+      : { bg: '#ffffff', surface: '#ffffff', surface2: '#f6f5f3', input: '#f6f5f3', border: '#e7e2db', borderStrong: '#d3ccc2', text: '#1d1c1a', muted: '#6b675f', ink: '#2f2e2c', inkText: '#ffffff', neutral: '#ece8e2', danger: '#b8530f', connectedText: '#16733f', disconnectedText: '#b42323', shadow: 'none' };
     const sem = status === 'semantic';
     const S = sem
       ? (dark ? { okBg: '#16301f', okFg: '#5fd39a', warnBg: '#342912', warnFg: '#e8b84a', errBg: '#3a1b1b', errFg: '#f58a8a' } : { okBg: '#e3f2ea', okFg: '#1e7a4f', warnBg: '#fbf0d6', warnFg: '#8a5d04', errBg: '#fbe6e4', errFg: '#b42323' })
