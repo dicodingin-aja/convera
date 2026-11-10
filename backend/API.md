@@ -9,11 +9,13 @@ Workspace milik orang lain dijawab 404.
 
 ```
 Webhook Cloud API ─┐
-Forward /v1/leads ─┼─> lead (upsert per nomor) ─> event_rules cocok / /v1/events / tandai manual
-Sesi QR (internal)─┘          └─> events (status queued) ─> cmd/worker ─> Meta CAPI ─> sent / failed
+Sesi QR (internal)─┴─> trigger cocok ─> lead (upsert per nomor) ─> events (status queued)
+Forward /v1/leads ───> lead (upsert per nomor)       └─> cmd/worker ─> Meta CAPI ─> sent / failed
 ```
 
-Isi pesan hanya dipakai di memori untuk mencocokkan aturan; tidak disimpan dan tidak di-log.
+Pesan WhatsApp hanya membuat atau memperbarui lead, event, dan bubble chat bila cocok dengan
+setidaknya satu `event_rule` aktif untuk pengirimnya; pesan tanpa trigger dilewati setelah deduplikasi.
+Isi pesan hanya dipakai di memori untuk mencocokkan aturan dan tidak disimpan bila tidak cocok.
 Pesan diproses di request webhook yang sama (milidetik) dan dijawab 200; yang lambat (panggil Meta) dikerjakan worker.
 Idempoten lewat `webhook_inbox (provider, message_id)`.
 

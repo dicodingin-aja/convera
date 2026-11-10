@@ -351,12 +351,19 @@ func (s *Server) qrStatus(c *gin.Context) {
 		ok(c, gin.H{"status": "disconnected", "phone_masked": nil, "last_seen_at": nil})
 		return
 	}
-	// Selama menunggu scan, sertakan kode QR terbaru dari layanan sesi (berganti tiap ~20 detik).
-	if rows[0]["status"] == "pending" {
-		if out, err := s.qrCall(c, http.MethodGet, "/sessions/"+wsID(c), nil); err == nil {
-			rows[0]["qr"], rows[0]["qr_image"] = out["qr"], out["qr_image"]
-			if st, _ := out["status"].(string); st == "disconnected" {
-				rows[0]["status"] = "disconnected" // QR kedaluwarsa tanpa di-scan
+	// Selalu baca status layanan sesi. Status database bisa tertinggal ketika koneksi
+	// putus sebelum layanan sempat mengirim laporan ke API.
+	if out, err := s.qrCall(c, http.MethodGet, "/sessions/"+wsID(c), nil); err == nil {
+		if qr, ok := out["qr"]; ok {
+			rows[0]["qr"] = qr
+		}
+		if image, ok := out["qr_image"]; ok {
+			rows[0]["qr_image"] = image
+		}
+		if st, _ := out["status"].(string); st == "connected" || st == "disconnected" || st == "pending" {
+			rows[0]["status"] = st
+			if st == "disconnected" {
+				_, _ = s.DB.Exec(c, `UPDATE wa_sessions SET status='disconnected', last_seen_at=now() WHERE workspace_id=$1`, wsID(c))
 			}
 		}
 	}
