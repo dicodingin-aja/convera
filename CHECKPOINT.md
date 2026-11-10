@@ -7,6 +7,16 @@ Legenda: ✅ sudah dan **terbukti dites** · 🟡 sudah dibuat tapi **belum terb
 
 ---
 
+## Catatan update v1.3 part 1 (10 November 2026)
+
+Commit `4d3e49c` (branch `Jordi`).
+
+- **Hapus lead per baris** di tab Leads: ikon sampah di tiap baris (desktop dan mobile) dengan dialog konfirmasi. Backend `DELETE /api/v1/leads/:id` menghapus permanen lead beserta event dan pesannya, dan dicatat di audit log dengan nomor yang disamarkan.
+- **Notifikasi maintenance**: saat admin menyalakan atau mematikan mode maintenance (Convera Admin > Developer), semua customer dapat notifikasi lonceng ("Convera sedang maintenance" / "Maintenance selesai"). Hanya terkirim bila status benar-benar berubah.
+- **Maintenance = hanya monitoring**: selama aktif, backend menolak dengan 503 `Maintenance Ongoing` untuk buat workspace baru, konversi manual, "Tandai Purchase", dan buat aturan event baru. Lihat data (leads, event, overview, laporan) tetap bisa. Webapp customer menampilkan banner "Maintenance Ongoing" (cek `/status` tiap 30 detik).
+- Yang sengaja tidak diblokir: data masuk otomatis (webhook WhatsApp, API key `/v1/events`) dan hapus lead.
+- Dites lewat API di DB lokal (hapus lead, notifikasi nyala/mati, penolakan 503, GET tetap 200). **Tampilan di browser belum dicek.**
+
 ## 0. Cara menjalankan (dev)
 
 Lihat [DEV.md](DEV.md) dan [backend/README.md](backend/README.md). Ringkasnya ada 6 proses:
