@@ -740,10 +740,10 @@ class Component extends DCLogic {
       ['token', 'warn', 'Token Meta kedaluwarsa dalam 5 hari.', 'Event berhenti terkirim setelah 22 Okt.', 'Ganti token', 'koneksi'],
       ['trial', 'info', 'Trial Growth tersisa 9 hari.', 'Pilih paket agar fitur ROAS & Event tetap aktif.', 'Pilih paket', 'pengaturan'],
     ].filter(([k]) => s.banners[k] && (k !== 'wa' || !waConnected));
-    const bStyle = { err: ['var(--errBg)', 'var(--text)'], warn: ['var(--accentSoft)', 'var(--accentText)'], info: ['var(--neutral)', 'var(--text)'] };
+    const bStyle = { err: ['var(--errBg)', 'var(--errFg)'], warn: ['var(--accentSoft)', 'var(--accentText)'], info: ['var(--neutral)', 'var(--text)'] };
     const banners = BAN.slice(0, 1).map(([k, t, title, body, cta, page]) => ({ title, body: '', cta, icon: t === 'info' ? ic.clock : ic.alert,
       act: () => this.setState({ page }), close: () => this.setState((st) => ({ banners: { ...st.banners, [k]: false } })),
-      style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '10px 10px 10px 14px', borderRadius: 12, background: bStyle[t][0], ...(t === 'err' ? { '--text': '#1d1c1a', '--surface': '#ffffff', '--muted': '#1d1c1a' } : {}) },
+      style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '10px 10px 10px 14px', borderRadius: 12, background: bStyle[t][0], color: bStyle[t][1] },
       iconStyle: { display: 'flex', flex: 'none', color: bStyle[t][1] } }));
     const page = NAV.find(([id]) => id === s.page) || NAV[0];
     const MOB = [['overview', 'Overview', 'dash'], ['leads', 'Leads', 'users'], ['konversi', 'Konversi', 'bag'], ['more', 'Lainnya', 'more']];
