@@ -174,7 +174,7 @@ export function liveTimeline(live, dl, tf, rp) {
 export function liveEventDetail(live, le, tab, tf, rp) {
   const e = live.eventDetail[le.eid];
   const pretty = (v) => JSON.stringify(v, null, 2);
-  if (!e) return { id: le.id + ' · ' + le.order, pre: 'Memuat…', explain: false, tips: [], canResend: false, retry: [] };
+  if (!e) return { id: le.id + ' · ' + le.order, pre: 'Memuat…', explain: false, tips: [], canResend: false, retry: [], detail: null };
   const hasErr = !!(e.error_message || e.hint);
   const retry = [[tf(new Date(e.created_at)), '—', 'Event dibuat · sumber ' + (SRC[e.source] || e.source)]];
   if (e.attempts > 0) retry.push([e.sent_at && e.status === 'sent' ? tf(new Date(e.sent_at)) : 'Terakhir', e.status === 'sent' ? '200' : (e.error_code || '—'), e.status === 'sent' ? 'Diterima Meta · ' + e.attempts + ' percobaan' : (e.error_message || 'Gagal') + ' · ' + e.attempts + ' percobaan']);
@@ -182,11 +182,23 @@ export function liveEventDetail(live, le, tab, tf, rp) {
   return {
     id: le.id + ' · ' + le.order,
     explain: hasErr, exTitle: evStatus(e) === 'Gagal' ? 'Event gagal dikirim ke Meta' : evStatus(e) === 'Kedaluwarsa' ? 'Event tidak dikirim' : 'Perlu diperhatikan',
-    exBody: e.error_message || '', tips: e.hint ? [e.hint] : [],
+    // Pesan error dan petunjuk sering berisi hal yang sama; tampilkan sekali saja.
+    ...(() => {
+      const msg = e.error_message || '', hint = e.hint || '';
+      const norm = (x) => x.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+      const same = msg && hint && (norm(hint).includes(norm(msg).slice(0, 30)) || norm(msg).includes(norm(hint).slice(0, 30)));
+      if (!hint) return { exBody: msg, tips: [] };
+      if (!msg || same) return { exBody: hint, tips: [] };
+      return { exBody: msg, tips: [hint] };
+    })(),
     facts: [['WAKTU', tf(new Date(e.created_at)) + ' WIB'], ['SUMBER', SRC[e.source] || e.source], ['NILAI', e.value ? rp(e.value) : '—'], ['CTWA_CLID', e.ctwa_clid || '—']].map(([k, v]) => ({ k, v })),
     pre: tab === 'payload' ? (e.request_payload ? pretty(e.request_payload) : 'Belum pernah dikirim ke Meta.') : (e.meta_response ? pretty(e.meta_response) : 'Belum ada respons dari Meta.'),
     retry: retry.map(([t, code, msg], k) => ({ t, code, msg, dot: { width: 10, height: 10, borderRadius: '50%', flex: 'none', marginTop: 4, background: k === retry.length - 1 ? 'var(--accent)' : 'var(--borderStrong)' } })),
     canResend: e.status === 'failed' && !['attribution_expired', 'not_from_ad'].includes(e.error_code),
+    // Props untuk EventDetail (tab "Detail").
+    detail: { eventName: e.event_name, status: e.status, source: SRC[e.source] || e.source, value: e.value || 0,
+      eventTime: new Date(e.event_time || e.created_at), eventId: e.event_id, payload: e.request_payload, response: e.meta_response,
+      errorCode: e.error_code, errorMessage: e.error_message },
   };
 }
 

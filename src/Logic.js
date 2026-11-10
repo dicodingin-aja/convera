@@ -4,6 +4,7 @@ import { printReport, downloadCsv, downloadJson, printInvoice } from './services
 import { buildEvent, sendEvent, testConnection } from './services/capi.js';
 import { testWebhook } from './services/webhook.js';
 import { liveOverview, liveTimeline, liveEventDetail, liveReport, rangeFor, LIVE_EVENTS } from './services/live.js';
+import EventDetail from './EventDetail.jsx';
 import { randomToken, uid } from './services/crypto.js';
 import { parseRecipients, checkPassword, isHttps, normPhone } from './services/validators.js';
 
@@ -366,7 +367,7 @@ class Component extends DCLogic {
     const lg = {
       stChips: (LV ? ['Semua', 'Terkirim', 'Gagal', 'Retry', 'Menunggu', 'Kedaluwarsa'] : ['Semua', 'Terkirim', 'Gagal', 'Retry', 'Duplikat', 'Kedaluwarsa']).map((x) => ({ label: x, pick: () => set({ lgSt: x }), style: { ...chip(lgSt === x), height: 30, fontSize: 12 } })),
       srcChips: ['Semua', 'API', 'Manual', 'Otomatis'].map((x) => ({ label: x, pick: () => set({ lgSrc: x }), style: { ...chip(lgSrc === x), height: 30, fontSize: 12 } })),
-      rows: lgRows.map((r) => ({ time: tfmt(r.d), ev: r.ev, src: r.src, ss: SRCB, value: r.value ? rp(r.value) : '—', clidShort: r.clid.slice(0, 14) + '…', st: r.st, pill: pill(EVP[r.st], EVP[r.st] === 'neutral' && r.st === 'Kedaluwarsa' ? { textDecoration: 'line-through' } : {}), code: CODE[r.st], open: () => set({ lgOpen: r.i + 1, lgTab: 'payload' }), copyIcon: s.copied === 'c' + r.i ? ic.check : ic.copy, copy: (e) => { e.stopPropagation(); copy(r.clid, 'c' + r.i); } })),
+      rows: lgRows.map((r) => ({ time: tfmt(r.d), ev: r.ev, src: r.src, ss: SRCB, value: r.value ? rp(r.value) : '—', clidShort: !r.clid || r.clid === '—' ? '—' : r.clid.length > 14 ? r.clid.slice(0, 14) + '…' : r.clid, st: r.st, pill: pill(EVP[r.st], EVP[r.st] === 'neutral' && r.st === 'Kedaluwarsa' ? { textDecoration: 'line-through' } : {}), code: CODE[r.st], open: () => set({ lgOpen: r.i + 1, lgTab: 'detail' }), copyIcon: s.copied === 'c' + r.i ? ic.check : ic.copy, copy: !r.clid || r.clid === '—' ? null : (e) => { e.stopPropagation(); copy(r.clid, 'c' + r.i); } })),
       count: lgRows.length + ' dari ' + LOG.length + (LV ? ' event terbaru' : ' event · 24 jam terakhir'),
     };
     const le = s.lgOpen ? LOG[s.lgOpen - 1] : null;
@@ -378,12 +379,12 @@ class Component extends DCLogic {
       const EX = { Gagal: ['Nomor telepon pelanggan tidak valid', 'Meta menolak karena nomor kosong atau formatnya salah sebelum di-hash. Event ini tidak diulang otomatis.', ['Pastikan nomor diawali 62, tanpa spasi atau tanda +.', 'Perbaiki data kontak, lalu klik Kirim ulang.']], Retry: ['Meta sedang membatasi permintaan', 'Meta sedang membatasi kiriman. Convera akan mencoba lagi otomatis.', ['Percobaan berikutnya dalam ±2 menit (3 dari 5).']], Kedaluwarsa: ['Lewat batas 7 hari sejak klik iklan', 'Meta hanya menerima konversi CTWA maksimal 7 hari setelah klik. Event ini tidak bisa dikirim ulang.', ['Tandai Purchase lebih cepat dari halaman Leads.', 'Aktifkan Event supaya closing langsung tercatat.']], Duplikat: ['Event yang sama sudah pernah dikirim', 'event_id ini sudah terkirim sebelumnya, jadi dilewati supaya konversi tidak dihitung dua kali.', ['Tidak perlu tindakan.']] }[le.st];
       const t0 = String(le.d.getHours()).padStart(2, '0') + ':' + String(le.d.getMinutes()).padStart(2, '0');
       const RET = { Terkirim: [[t0 + ':04', '200', 'Diterima Meta · events_received: 1']], Duplikat: [[t0 + ':02', '—', 'Dilewati: event_id ' + le.order + ' sudah terkirim']], Retry: [[t0 + ':03', '429', 'Rate limit dari Meta'], [t0 + ':33', '429', 'Rate limit dari Meta'], ['Terjadwal', '—', 'Percobaan 3/5 dalam 2 menit']], Gagal: [[t0 + ':03', '400', 'Invalid parameter: user_data.ph'], [t0 + ':35', '400', 'Invalid parameter: user_data.ph'], [t0 + ':58', '400', 'Dihentikan: error permanen']], Kedaluwarsa: [[t0 + ':02', '400', 'event_time lebih dari 7 hari']] }[le.st] || [];
-      const tab = s.lgTab || 'payload';
+      const tab = s.lgTab === 'riwayat' ? 'riwayat' : 'detail';
       lgd = { open: true, close: () => set({ lgOpen: null }), id: le.id + ' · ' + le.order, ev: le.ev, st: le.st, pill: pill(EVP[le.st]),
-        tabs: [['payload', 'Payload'], ['respons', 'Respons Meta'], ['riwayat', 'Riwayat retry']].map(([k, label]) => ({ label, pick: () => set({ lgTab: k }), style: { fontFamily: 'inherit', height: 38, padding: 0, border: 'none', borderBottom: tab === k ? '2px solid var(--accent)' : '2px solid transparent', background: 'transparent', color: tab === k ? 'var(--text)' : 'var(--muted)', fontSize: 14, fontWeight: tab === k ? 500 : 400, cursor: 'pointer', whiteSpace: 'nowrap' } })),
+        tabs: [['detail', 'Detail'], ['riwayat', 'Riwayat']].map(([k, label]) => ({ label, pick: () => set({ lgTab: k }), style: { fontFamily: 'inherit', height: 38, padding: 0, border: 'none', borderBottom: tab === k ? '2px solid var(--accent)' : '2px solid transparent', background: 'transparent', color: tab === k ? 'var(--text)' : 'var(--muted)', fontSize: 14, fontWeight: tab === k ? 500 : 400, cursor: 'pointer', whiteSpace: 'nowrap' } })),
         explain: !!EX, exTitle: EX ? EX[0] : '', exBody: EX ? EX[1] : '', tips: EX ? EX[2] : [],
-        facts: [['WAKTU', tfmt(le.d) + ' WIB'], ['SUMBER', le.src], ['NILAI', le.value ? rp(le.value) : '—'], ['CTWA_CLID', le.clid]].map(([k, v]) => ({ k, v })),
-        tPre: tab !== 'riwayat', pre: JSON.stringify(tab === 'payload' ? payload : RESP[le.st], null, 2), tRetry: tab === 'riwayat',
+        facts: [], tPre: false, tRetry: tab === 'riwayat',
+        detailNode: tab === 'detail' ? React.createElement(EventDetail, { eventName: le.ev, status: le.st, source: le.src, value: le.value, eventTime: le.d, eventId: le.order, payload, response: RESP[le.st], fmtTime: tfmt, rp }) : null,
         retry: RET.map(([t, code, msg], k) => ({ t, code, msg, dot: { width: 10, height: 10, borderRadius: '50%', flex: 'none', marginTop: 4, background: k === RET.length - 1 ? 'var(--accent)' : 'var(--borderStrong)' } })),
         canResend: le.st === 'Gagal' || le.st === 'Retry',         resend: async () => {
           const eid = uid();
@@ -399,8 +400,10 @@ class Component extends DCLogic {
           }
         } };
       if (LV) {
-        const tabL = s.lgTab || 'payload';
-        lgd = { ...lgd, ...liveEventDetail(LV, le, tabL, tfmt, rp), tPre: tabL !== 'riwayat', tRetry: tabL === 'riwayat',
+        const tabL = s.lgTab === 'riwayat' ? 'riwayat' : 'detail';
+        const ld = liveEventDetail(LV, le, tabL, tfmt, rp);
+        lgd = { ...lgd, ...ld, facts: [], tPre: tabL === 'detail' && !ld.detail, pre: 'Memuat…', tRetry: tabL === 'riwayat',
+          detailNode: tabL === 'detail' && ld.detail ? React.createElement(EventDetail, { ...ld.detail, fmtTime: tfmt, rp }) : null,
           resend: async () => { set({ lgOpen: null }); const r = await this.__host.liveRetry(le.eid); say(r.ok ? 'Event dikirim ulang' : 'Event gagal dikirim ulang', r.message); } };
       }
     }
