@@ -73,6 +73,9 @@ export default function QrScanPage({ themeStyle, workspace, onDone, onBack }) {
 
         {phase === 'scan' ? (
           <>
+            <div role="note" style={{ maxWidth: 360, padding: '10px 12px', borderRadius: 10, background: 'var(--accentSoft)', color: 'var(--text)', fontSize: 13, lineHeight: 1.5, textAlign: 'left' }}>
+              <b>⚠ Mode scan QR bukan koneksi resmi Meta.</b> Nomor kamu bisa diblokir WhatsApp. Pakai WABA (resmi) untuk nomor utama.
+            </div>
             <img src={qr} alt="Kode QR untuk menautkan WhatsApp" width={260} height={260} style={{ borderRadius: 12, background: '#fff', padding: 8 }} />
             <ol style={{ margin: 0, paddingLeft: 18, textAlign: 'left', fontSize: 13, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 4 }}>
               <li>Buka <b>WhatsApp Business</b> di ponsel.</li>

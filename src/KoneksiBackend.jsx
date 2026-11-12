@@ -203,6 +203,9 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
 
   const set = (k) => (e) => { setF((v) => ({ ...v, [k]: e.target.value })); setMsg(null); };
   const isWaba = f.mode === 'waba';
+  // Mode QR bukan jalur resmi Meta: customer wajib menyetujui risiko blokir sebelum scan.
+  const [qrAgree, setQrAgree] = useState(false);
+  const needAgree = !isWaba && !(wa && wa.status === 'connected');
 
   const save = async (opts = {}) => {
     const next = {};
@@ -221,7 +224,7 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
       setConn(c); fill(c);
       onSave({ waType: c.mode, pixelId: c.pixel_id || '' }); // tanpa token/secret
       setMsg({ ok: true, text: 'Tersimpan' });
-      if (opts.scan && f.mode === 'qr' && c.pixel_id && c.has_token && !(wa && wa.status === 'connected')) onScanQr();
+      if (opts.scan && f.mode === 'qr' && qrAgree && c.pixel_id && c.has_token && !(wa && wa.status === 'connected')) onScanQr();
       return true;
     } catch (e) { setMsg({ ok: false, text: e.message }); return false; }
     finally { setBusy(''); }
@@ -263,6 +266,17 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
             <button type="button" onClick={pick('waba')} style={radio(isWaba)}>WABA (resmi)<span style={dot(isWaba)} /></button>
             <button type="button" onClick={pick('qr')} style={radio(!isWaba)}>WA Bisnis (scan QR) · Beta<span style={dot(!isWaba)} /></button>
           </div>
+          {!isWaba ? (
+            <div role="note" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 14px', borderRadius: 10, background: 'var(--accentSoft)', color: 'var(--text)', fontSize: 13, fontWeight: 400, lineHeight: 1.5 }}>
+              <span><b>⚠ Mode scan QR bukan koneksi resmi Meta.</b> Nomor kamu bisa diblokir WhatsApp. Pakai WABA (resmi) untuk nomor utama.</span>
+              {needAgree ? (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 500 }}>
+                  <input type="checkbox" checked={qrAgree} onChange={(e) => setQrAgree(e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }} />
+                  Saya paham risikonya dan tetap ingin pakai scan QR.
+                </label>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <label style={label}>Pixel / Dataset ID
           <input value={f.pixelId} onChange={set('pixelId')} inputMode="numeric" placeholder="123456789123456" style={field} />
@@ -309,7 +323,7 @@ export default function KoneksiBackend({ workspace, onSave, onScanQr }) {
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <button type="submit" disabled={!!busy} style={{ ...btn, padding: '0 24px', background: 'var(--accent)', color: '#fff', opacity: busy ? 0.7 : 1 }}>{busy === 'save' ? 'Menyimpan…' : f.mode === 'qr' && !(wa && wa.status === 'connected') ? 'Simpan & lanjut scan QR' : 'Simpan'}</button>
+        <button type="submit" disabled={!!busy || (needAgree && !qrAgree)} title={needAgree && !qrAgree ? 'Centang persetujuan risiko scan QR dulu' : undefined} style={{ ...btn, padding: '0 24px', background: 'var(--accent)', color: '#fff', opacity: busy || (needAgree && !qrAgree) ? 0.5 : 1, cursor: needAgree && !qrAgree ? 'not-allowed' : 'pointer' }}>{busy === 'save' ? 'Menyimpan…' : f.mode === 'qr' && !(wa && wa.status === 'connected') ? 'Simpan & lanjut scan QR' : 'Simpan'}</button>
         {f.testCode.trim() ? (
   <button type="button" onClick={test} disabled={!!busy} style={{ ...btn, background: 'var(--surface2)', color: 'var(--text)', boxShadow: 'inset 0 0 0 1.5px var(--borderStrong)', opacity: busy ? 0.7 : 1 }}>{busy === 'test' ? 'Mengetes…' : 'Tes Koneksi'}</button>
         ) : null}
