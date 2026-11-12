@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"strings"
 	"sync"
@@ -49,6 +50,19 @@ type session struct {
 	qr     string // kode QR terbaru (mentah)
 	status string // pending | connected | disconnected
 	cancel context.CancelFunc
+
+	dead bool // sudah dilepas (lost/forget); cegah laporan/notifikasi ganda dan event susulan
+}
+
+// markDead menandai sesi sudah dilepas; mengembalikan false bila sebelumnya sudah ditandai.
+func (s *session) markDead() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.dead {
+		return false
+	}
+	s.dead = true
+	return true
 }
 
 func NewManager(ctx context.Context, db *pgxpool.Pool, store *sqlstore.Container, apiURL, token string) *Manager {
@@ -83,7 +97,12 @@ func (m *Manager) Resume(ctx context.Context) {
 			}
 			m.report(id, "disconnected", "")
 		}
-		time.Sleep(300 * time.Millisecond)
+		// Jeda acak 1-4 detik antar sesi agar koneksi tidak serentak/berpola saat restart.
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Duration(1000+rand.Intn(3000)) * time.Millisecond):
+		}
 	}
 	log.Printf("waqr: %d sesi dipulihkan", len(ids))
 }
@@ -171,7 +190,9 @@ func (m *Manager) open(ctx context.Context, ws string, pair bool) (*session, err
 		}
 	}
 	cli := whatsmeow.NewClient(dev, m.Log)
-	cli.EnableAutoReconnect = true
+	// Mode aman: tanpa reconnect otomatis. Reconnect berulang terlihat seperti bot di mata WhatsApp. Bila koneksi
+	// putus, sesi dilepas (lost) dan pelanggan harus menyambungkan lagi secara manual dari dashboard.
+	cli.EnableAutoReconnect = false
 	cli.AutoTrustIdentity = true
 	sctx, cancel := context.WithCancel(m.ctx)
 	s := &session{ws: ws, client: cli, status: "pending", cancel: cancel}
@@ -217,6 +238,7 @@ func (m *Manager) open(ctx context.Context, ws string, pair bool) (*session, err
 }
 
 func (m *Manager) forget(ws string, s *session) {
+	s.markDead() // abaikan event susulan dari klien yang sudah dilepas
 	m.mu.Lock()
 	if m.sessions[ws] == s {
 		delete(m.sessions, ws)
@@ -286,15 +308,20 @@ func (m *Manager) handle(s *session, evt any) {
 		log.Printf("waqr ws=%s: dibatasi sementara oleh WhatsApp: %v", s.ws, e)
 		m.lost(s, false)
 	case *events.ClientOutdated:
-		log.Printf("waqr ws=%s: versi klien WhatsApp usang, perlu memperbarui library", s.ws)
+		// Perlu tindakan: update whatsmeow (go get -u go.mau.fi/whatsmeow@latest) lalu deploy ulang. Pasang alert pada "ALERT".
+		log.Printf("ALERT waqr ws=%s: versi klien WhatsApp usang, perlu memperbarui library whatsmeow", s.ws)
 		m.lost(s, false)
 	case *events.ConnectFailure:
-		// Alasan 401/403 (sesi dicabut) sudah diikuti event LoggedOut oleh library; selainnya bisa dicoba lagi otomatis.
-		log.Printf("waqr ws=%s: gagal menyambung (reason=%v)", s.ws, e.Reason)
-		// Jangan biarkan dashboard menampilkan "Terhubung" ketika reconnect sedang berlangsung.
-		// Client tetap dipertahankan agar EnableAutoReconnect dapat memulihkan sesi.
-		s.set("", "disconnected")
-		m.report(s.ws, "disconnected", "")
+		// Sesi dicabut (401/403/406), temp ban, dan client outdated punya event sendiri; ini untuk kegagalan lainnya.
+		// Tanpa auto-reconnect library tidak menyambung lagi, jadi lepas sesi dan minta pelanggan menyambungkan manual.
+		log.Printf("waqr ws=%s: gagal menyambung (reason=%v), sesi dilepas", s.ws, e.Reason)
+		m.lost(s, false)
+	case *events.Disconnected: // koneksi putus tak terduga (jaringan/server WA); library tidak reconnect otomatis
+		if _, st := s.snapshot(); st == "pending" {
+			return // proses penautan QR menangani sendiri (timeout/gagal)
+		}
+		log.Printf("waqr ws=%s: koneksi terputus, sesi dilepas (perlu disambungkan manual)", s.ws)
+		m.lost(s, false)
 	case *events.Message:
 		m.onMessage(s, e)
 	}
@@ -303,6 +330,9 @@ func (m *Manager) handle(s *session, evt any) {
 // lost menandai sesi workspace ini terputus, memberi tahu API (status + notifikasi), dan melepas klien dari memori.
 // revoke=true: tautan perangkat sudah tidak sah (dicabut dari ponsel) sehingga JID dibuang dan perlu scan QR ulang.
 func (m *Manager) lost(s *session, revoke bool) {
+	if !s.markDead() { // sudah dilepas oleh event lain: jangan lapor/notifikasi dua kali
+		return
+	}
 	s.set("", "disconnected")
 	if revoke {
 		_, _ = m.DB.Exec(m.ctx, `UPDATE wa_sessions SET device_jid = NULL WHERE workspace_id::text = $1`, s.ws)
